@@ -1,0 +1,48 @@
+{
+  "name": "d3-wordcloud",
+  "version": "1.0.0",
+  "description": "A modern D3 word cloud layout with incremental word placement and animation support.",
+  "keywords": [
+    "d3",
+    "d3-module",
+    "word",
+    "cloud",
+    "tag",
+    "layout",
+    "visualization"
+  ],
+  "homepage": "https://github.com/sanand0/d3-wordcloud",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sanand0/d3-wordcloud.git"
+  },
+  "license": "BSD-3-Clause",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "jsdelivr": "dist/d3-wordcloud.min.js",
+  "unpkg": "dist/d3-wordcloud.min.js",
+  "exports": {
+    "umd": "./dist/d3-wordcloud.min.js",
+    "default": "./src/index.js"
+  },
+  "files": [
+    "src/**/*.js",
+    "dist/**/*.js"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "d3-dispatch": "1 - 3"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.0.0"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

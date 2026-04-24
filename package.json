@@ -16,7 +16,7 @@
     "type": "git",
     "url": "https://github.com/sanand0/d3-wordcloud.git"
   },
-  "license": "BSD-3-Clause",
+  "license": "MIT",
   "type": "module",
   "main": "src/index.js",
   "module": "src/index.js",
@@ -28,7 +28,10 @@
   },
   "files": [
     "src/**/*.js",
-    "dist/**/*.js"
+    "dist/**/*.js",
+    "index.html",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "dependencies": {
@@ -40,6 +43,7 @@
   },
   "scripts": {
     "build": "rollup -c",
+    "test": "node --test",
     "prepublishOnly": "npm run build"
   },
   "engines": {

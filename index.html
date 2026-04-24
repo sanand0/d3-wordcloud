@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>d3-wordcloud — modern D3 word cloud layout</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
+  <!-- d3-dispatch bare specifier needed by src/index.js -->
+  <script type="importmap">
+  { "imports": { "d3-dispatch": "https://cdn.jsdelivr.net/npm/d3-dispatch@3/+esm" } }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f9fb;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --muted: #64748b;
+      --accent: #3b82f6;
+      --accent-dark: #1d4ed8;
+      --code-bg: #0d1117;
+      --radius: 8px;
+      --gap: 2rem;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-dark); text-decoration: underline; }
+
+    /* ── Header ──────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff;
+      padding: 4rem 2rem 3rem;
+      text-align: center;
+    }
+    header h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+    header h1 span { opacity: 0.7; font-weight: 400; }
+    header p {
+      font-size: 1.15rem;
+      opacity: 0.85;
+      max-width: 560px;
+      margin: 0.5rem auto 1.5rem;
+    }
+    .badges { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 999px;
+      padding: 0.25rem 0.8rem;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+
+    /* ── Nav ─────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav a {
+      display: block;
+      padding: 0.8rem 1rem;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--muted);
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    nav a:hover { color: var(--accent); text-decoration: none; border-bottom-color: var(--accent); }
+
+    /* ── Page layout ─────────────────────────── */
+    main { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+
+    section { margin-bottom: 4rem; scroll-margin-top: 3.5rem; }
+    section h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+    section > p { color: var(--muted); margin: 0.75rem 0 1.5rem; max-width: 680px; }
+
+    /* ── Install box ─────────────────────────── */
+    .install-box {
+      background: var(--code-bg);
+      border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      max-width: 480px;
+    }
+    .install-box code {
+      color: #7ee787;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 1rem;
+      flex: 1;
+    }
+    .copy-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Example grid (code + cloud) ─────────── */
+    .example {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--gap);
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .example { grid-template-columns: 1fr; }
+    }
+
+    .cloud-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cloud-box svg { display: block; width: 100%; }
+
+    pre {
+      border-radius: var(--radius);
+      overflow: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      max-height: 460px;
+    }
+    pre code.hljs { border-radius: var(--radius); }
+
+    /* ── API table ───────────────────────────── */
+    .api-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .api-table th, .api-table td { padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .api-table th { font-weight: 600; background: #f1f5f9; }
+    .api-table code { font-family: monospace; font-size: 0.82rem; background: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 3px; }
+
+    /* ── Animated demo controls ──────────────── */
+    .controls { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.45rem 1rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+    .btn:hover { background: var(--accent-dark); }
+    .btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn.secondary:hover { background: #f1f5f9; }
+
+    /* ── Two-cloud layout for spiral comparison ─ */
+    .two-up {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .two-up h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    /* ── Status/loading indicator ────────────── */
+    .loading { color: var(--muted); font-size: 0.85rem; padding: 2rem; text-align: center; }
+
+    /* ── Footer ──────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>d3-wordcloud <span>for D3 v7+</span></h1>
+  <p>A modern word cloud layout — with incremental placement, so clouds can be built and animated one word at a time.</p>
+  <div class="badges">
+    <span class="badge">ESM + UMD</span>
+    <span class="badge">D3 v7</span>
+    <span class="badge">MIT</span>
+    <span class="badge">0 peer deps beyond d3-dispatch</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#install">Install</a>
+  <a href="#demo-basic">Basic</a>
+  <a href="#demo-incremental">Incremental</a>
+  <a href="#demo-spirals">Spirals</a>
+  <a href="#demo-rotation">Rotation</a>
+  <a href="#demo-color">Color &amp; Font</a>
+  <a href="#api">API</a>
+</nav>
+
+<main>
+
+<!-- ── Install ───────────────────────────────────────────────── -->
+<section id="install">
+  <h2>Install</h2>
+  <p>Via npm (once published) — or import the source directly in the browser using an <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap">import map</a>.</p>
+  <div class="install-box">
+    <code>npm install d3-wordcloud</code>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('npm install d3-wordcloud')">copy</button>
+  </div>
+  <br>
+  <pre><code id="install-esm" class="language-javascript"></code></pre>
+</section>
+
+<!-- ── Basic ─────────────────────────────────────────────────── -->
+<section id="demo-basic">
+  <h2>Basic word cloud</h2>
+  <p>Supply a <code>words</code> array where each object has a <code>text</code> string and a numeric <code>value</code>. The default font size accessor is <code>d =&gt; Math.sqrt(d.value)</code>.</p>
+  <div class="example">
+    <div>
+      <div class="cloud-box" id="cloud-basic"><span class="loading">Rendering…</span></div>
+    </div>
+    <pre><code id="code-basic" class="language-javascript"></code></pre>
+  </div>
+</section>
+
+<!-- ── Incremental ────────────────────────────────────────────── -->
+<section id="demo-incremental">
+  <h2>Incremental placement</h2>
+  <p>Call <code>cloud.add(words)</code> to place new words into the existing layout without disturbing already-placed ones. Pair with the <code>"word"</code> event to animate each arrival.</p>
+  <div class="controls">
+    <button class="btn" id="btn-add">Add 5 words</button>
+    <button class="btn secondary" id="btn-reset">Reset</button>
+    <span id="word-count" style="align-self:center;font-size:.85rem;color:var(--muted)"></span>
+  </div>
+  <div class="example">
+    <div>
+      <div class="cloud-box" id="cloud-incremental"><span class="loading">Click "Add 5 words" to begin</span></div>
+    </div>
+    <pre><code id="code-incremental" class="language-javascript"></code></pre>
+  </div>
+</section>
+
+<!-- ── Spirals ────────────────────────────────────────────────── -->
+<section id="demo-spirals">
+  <h2>Spiral patterns</h2>
+  <p>Two built-in spiral strategies control how the layout searches for free positions. Both receive the same word list and random seed for a fair comparison.</p>
+  <div class="example" style="grid-template-columns: 1fr;">
+    <div class="two-up">
+      <div>
+        <h3>Archimedean (default)</h3>
+        <div class="cloud-box" id="cloud-archimedean"><span class="loading">Rendering…</span></div>
+      </div>
+      <div>
+        <h3>Rectangular</h3>
+        <div class="cloud-box" id="cloud-rectangular"><span class="loading">Rendering…</span></div>
+      </div>
+    </div>
+    <pre><code id="code-spirals" class="language-javascript"></code></pre>
+  </div>
+</section>
+
+<!-- ── Rotation ───────────────────────────────────────────────── -->
+<section id="demo-rotation">
+  <h2>Rotation</h2>
+  <p>The <code>rotate</code> accessor controls word angles. Here are three common configurations rendered side by side.</p>
+  <div class="example" style="grid-template-columns: 1fr;">
+    <div class="two-up" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div>
+        <h3>Horizontal only</h3>
+        <div class="cloud-box" id="cloud-rot-0"><span class="loading">…</span></div>
+      </div>
+      <div>
+        <h3>0° and 90°</h3>
+        <div class="cloud-box" id="cloud-rot-90"><span class="loading">…</span></div>
+      </div>
+      <div>
+        <h3>Random (±60°)</h3>
+        <div class="cloud-box" id="cloud-rot-rand"><span class="loading">…</span></div>
+      </div>
+    </div>
+    <pre><code id="code-rotation" class="language-javascript"></code></pre>
+  </div>
+</section>
+
+<!-- ── Color & Font ───────────────────────────────────────────── -->
+<section id="demo-color">
+  <h2>Color &amp; font</h2>
+  <p>The layout computes positions only — color, font family, and any other visual properties are applied in your render function, using D3 scales or any other approach.</p>
+  <div class="example">
+    <div>
+      <div class="cloud-box" id="cloud-color"><span class="loading">Rendering…</span></div>
+    </div>
+    <pre><code id="code-color" class="language-javascript"></code></pre>
+  </div>
+</section>
+
+<!-- ── API reference ──────────────────────────────────────────── -->
+<section id="api">
+  <h2>API reference</h2>
+
+  <p>All configuration methods are chainable and follow the getter/setter pattern: called with no argument they return the current value; called with an argument they set it and return <code>cloud</code>. Accessors accept either a constant value or a function <code>(datum, index) → value</code>.</p>
+
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>cloud.start()</code></td><td></td><td>Clear the board and place all <code>.words()</code> from scratch. Returns <code>cloud</code>.</td></tr>
+      <tr><td><code>cloud.stop()</code></td><td></td><td>Cancel any running async layout and free sprite memory.</td></tr>
+      <tr><td><code>cloud.add(words)</code></td><td></td><td>Place <code>words</code> into the existing layout without re-placing already-placed words. Initialises automatically if <code>start()</code> has not been called.</td></tr>
+      <tr><td><code>cloud.clear()</code></td><td></td><td>Reset persistent state (board, bounds, placed list). The next <code>start()</code> begins from an empty board.</td></tr>
+      <tr><td><code>cloud.placed()</code></td><td></td><td>Return a snapshot array of all successfully placed word datums (cumulative across <code>start()</code> and <code>add()</code> calls).</td></tr>
+      <tr><td><code>cloud.words(array)</code></td><td><code>[]</code></td><td>Input word data.</td></tr>
+      <tr><td><code>cloud.size([w, h])</code></td><td><code>[256, 256]</code></td><td>Layout area in pixels. Word <code>x</code>/<code>y</code> coordinates are relative to the centre.</td></tr>
+      <tr><td><code>cloud.text(fn)</code></td><td><code>d =&gt; d.text</code></td><td>Text string accessor.</td></tr>
+      <tr><td><code>cloud.fontSize(fn)</code></td><td><code>d =&gt; Math.sqrt(d.value)</code></td><td>Font size in pixels.</td></tr>
+      <tr><td><code>cloud.font(fn)</code></td><td><code>"serif"</code></td><td>Font family.</td></tr>
+      <tr><td><code>cloud.fontStyle(fn)</code></td><td><code>"normal"</code></td><td>CSS font-style.</td></tr>
+      <tr><td><code>cloud.fontWeight(fn)</code></td><td><code>"normal"</code></td><td>CSS font-weight.</td></tr>
+      <tr><td><code>cloud.rotate(fn)</code></td><td>random ±30°/60°</td><td>Rotation in degrees.</td></tr>
+      <tr><td><code>cloud.padding(fn)</code></td><td><code>1</code></td><td>Extra spacing around each word (pixels).</td></tr>
+      <tr><td><code>cloud.spiral(name | fn)</code></td><td><code>"archimedean"</code></td><td><code>"archimedean"</code> or <code>"rectangular"</code>. Pass a custom <code>(size) =&gt; t =&gt; [dx, dy]</code> factory for full control.</td></tr>
+      <tr><td><code>cloud.random(fn)</code></td><td><code>Math.random</code></td><td>RNG. Pass a seeded function for reproducible layouts.</td></tr>
+      <tr><td><code>cloud.timeInterval(ms)</code></td><td><code>Infinity</code></td><td>Max milliseconds per event-loop tick. Lower values keep the UI responsive during large layouts.</td></tr>
+      <tr><td><code>cloud.canvas(fn)</code></td><td><code>() =&gt; document.createElement("canvas")</code></td><td>Canvas factory. Override for server-side rendering (e.g. node-canvas).</td></tr>
+      <tr><td><code>cloud.on("word", fn)</code></td><td></td><td>Called once per successfully placed word. Argument: the word datum.</td></tr>
+      <tr><td><code>cloud.on("end", fn)</code></td><td></td><td>Called when the current batch finishes. Arguments: <code>(batchPlaced, bounds)</code>.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    d3-wordcloud is a modernization of
+    <a href="https://github.com/jasondavies/d3-cloud">Jason Davies' d3-cloud</a>
+    (algorithm by Jonathan Feinberg) ·
+    <a href="https://github.com/sanand0/d3-wordcloud">GitHub</a> ·
+    MIT License
+  </p>
+</footer>
+
+<!-- highlight.js (regular script — runs synchronously, available to module script below) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<script type="module">
+import { cloud, spirals } from "./src/index.js";
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+const W = 500, H = 300; // default cloud dimensions
+
+function svgCloud(containerId) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = "";
+  return d3.select(el).append("svg")
+    .attr("viewBox", `0 0 ${W} ${H}`)
+    .attr("width", "100%");
+}
+
+function drawWords(svg, placed, colorFn) {
+  svg.selectAll("text")
+    .data(placed, (d) => d.text)
+    .join(
+      (enter) => enter.append("text")
+        .attr("text-anchor", "middle")
+        .attr("transform", (d) => `translate(${d.x + W / 2},${d.y + H / 2}) rotate(${d.rotate})`)
+        .style("font-size",   (d) => `${d.size}px`)
+        .style("font-family", (d) => d.font)
+        .style("font-weight", (d) => d.weight)
+        .style("fill",        colorFn)
+        .style("opacity", 0)
+        .text((d) => d.text)
+        .call((t) => t.transition().duration(400).style("opacity", 1))
+    );
+}
+
+// Seeded LCG so spiral comparisons use identical randomness.
+function seeded(s = 42) {
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
+}
+
+// D3 colour scales used across demos.
+const palette   = d3.scaleOrdinal(d3.schemeTableau10);
+const coolPal   = d3.scaleOrdinal(d3.schemePastel1);
+
+// ─── Word datasets ────────────────────────────────────────────────────────────
+
+const techWords = [
+  { text: "visualization", value: 2400 },
+  { text: "D3",            value: 2000 },
+  { text: "JavaScript",    value: 1800 },
+  { text: "SVG",           value: 1500 },
+  { text: "layout",        value: 1200 },
+  { text: "canvas",        value: 1000 },
+  { text: "word cloud",    value:  900 },
+  { text: "data",          value:  800 },
+  { text: "animation",     value:  700 },
+  { text: "incremental",   value:  650 },
+  { text: "spiral",        value:  600 },
+  { text: "collision",     value:  550 },
+  { text: "bitmap",        value:  500 },
+  { text: "font",          value:  450 },
+  { text: "rotate",        value:  400 },
+  { text: "placement",     value:  380 },
+  { text: "dispatch",      value:  350 },
+  { text: "ESM",           value:  320 },
+];
+
+// Words for the incremental demo, drip-fed in batches of 5.
+const incrPool = [
+  { text: "JavaScript", value: 1600 }, { text: "Python",     value: 1500 },
+  { text: "TypeScript", value: 1300 }, { text: "Rust",       value: 1200 },
+  { text: "Go",         value: 1100 }, { text: "Java",       value: 1050 },
+  { text: "C++",        value:  900 }, { text: "Ruby",       value:  800 },
+  { text: "Swift",      value:  750 }, { text: "Kotlin",     value:  700 },
+  { text: "Scala",      value:  650 }, { text: "Haskell",    value:  600 },
+  { text: "Clojure",    value:  550 }, { text: "Elixir",     value:  500 },
+  { text: "Julia",      value:  480 }, { text: "R",          value:  460 },
+  { text: "Perl",       value:  440 }, { text: "PHP",        value:  420 },
+  { text: "C",          value:  400 }, { text: "Erlang",     value:  380 },
+  { text: "Zig",        value:  360 }, { text: "Nim",        value:  340 },
+  { text: "OCaml",      value:  320 }, { text: "F#",         value:  300 },
+  { text: "Dart",       value:  290 }, { text: "Lua",        value:  280 },
+  { text: "Groovy",     value:  260 }, { text: "COBOL",      value:  250 },
+  { text: "Fortran",    value:  240 }, { text: "BASIC",      value:  230 },
+];
+
+// ─── 1. Basic word cloud ──────────────────────────────────────────────────────
+
+(function demoBasic() {
+  const svg = svgCloud("cloud-basic");
+
+  cloud()
+    .size([W, H])
+    .words(techWords.map((d) => ({ ...d })))
+    .fontSize((d) => Math.sqrt(d.value) * 1.4)
+    .font("Impact, sans-serif")
+    .rotate(0)
+    .padding(3)
+    .on("end", (placed) => drawWords(svg, placed, (d, i) => palette(i)))
+    .start();
+
+  setCode("code-basic", `
+import { cloud } from "./src/index.js";
+
+const words = [
+  { text: "visualization", value: 2400 },
+  { text: "D3",            value: 2000 },
+  { text: "JavaScript",    value: 1800 },
+  // … more words
+];
+
+cloud()
+  .size([500, 300])
+  .words(words)
+  .fontSize((d) => Math.sqrt(d.value) * 1.4)
+  .font("Impact, sans-serif")
+  .rotate(0)         // all horizontal
+  .padding(3)
+  .on("end", (placed) => {
+    // place SVG <text> elements using placed[i].{x, y, rotate, size, font}
+    svg.selectAll("text")
+      .data(placed)
+      .join("text")
+      .attr("text-anchor", "middle")
+      .attr("transform", (d) =>
+        \`translate(\${d.x + W/2},\${d.y + H/2}) rotate(\${d.rotate})\`)
+      .style("font-size",   (d) => \`\${d.size}px\`)
+      .style("font-family", (d) => d.font)
+      .style("fill",        (d, i) => palette(i))
+      .text((d) => d.text);
+  })
+  .start();
+`);
+})();
+
+// ─── 2. Incremental animation ─────────────────────────────────────────────────
+
+(function demoIncremental() {
+  let layout = null;
+  let svgEl  = null;
+  let cursor = 0;
+
+  function initLayout() {
+    if (layout) { layout.stop(); layout = null; }
+    svgEl = svgCloud("cloud-incremental");
+    cursor = 0;
+    document.getElementById("word-count").textContent = "";
+
+    layout = cloud()
+      .size([W, H])
+      .fontSize((d) => Math.sqrt(d.value) * 1.5)
+      .font("'Trebuchet MS', sans-serif")
+      .padding(4)
+      // "word" fires once per placed word — ideal for per-word animation.
+      .on("word", (d) => {
+        svgEl.append("text")
+          .datum(d)
+          .attr("text-anchor", "middle")
+          .attr("transform",
+            `translate(${d.x + W / 2},${d.y + H / 2}) rotate(${d.rotate})`)
+          .style("font-size",   `${d.size}px`)
+          .style("font-family", d.font)
+          .style("fill",        palette(d.text))
+          .style("opacity",     0)
+          .text(d.text)
+          .transition().duration(500)
+          .style("opacity", 1);
+      });
+  }
+
+  function addBatch() {
+    if (!layout) initLayout();
+    const batch = incrPool.slice(cursor, cursor + 5);
+    if (!batch.length) return;
+    cursor += batch.length;
+    layout.add(batch.map((d) => ({ ...d })));
+    document.getElementById("word-count").textContent =
+      `${layout.placed().length} word${layout.placed().length === 1 ? "" : "s"} placed`;
+  }
+
+  document.getElementById("btn-add").addEventListener("click", addBatch);
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    if (layout) { layout.stop(); layout = null; }
+    svgEl = null;
+    cursor = 0;
+    document.getElementById("word-count").textContent = "";
+    document.getElementById("cloud-incremental").innerHTML =
+      '<span class="loading">Click "Add 5 words" to begin</span>';
+  });
+
+  setCode("code-incremental", `
+import { cloud } from "./src/index.js";
+
+// Build a layout once — re-use across add() calls.
+const layout = cloud()
+  .size([500, 300])
+  .fontSize((d) => Math.sqrt(d.value) * 1.5)
+  .padding(4)
+  // "word" fires for every newly placed word.
+  .on("word", (d) => {
+    svg.append("text")
+      .datum(d)
+      // ... position and style ...
+      .style("opacity", 0)
+      .transition().duration(500)
+      .style("opacity", 1);  // fade-in animation
+  });
+
+// First batch — initialises the board.
+layout.words(firstFive).start();
+
+// Later, add more words without disturbing existing ones.
+layout.add(nextFive);
+layout.add(moreWords);
+
+// Reset to an empty board.
+layout.clear().words([]).start();
+`);
+})();
+
+// ─── 3. Spiral comparison ─────────────────────────────────────────────────────
+
+(function demoSpirals() {
+  const words = techWords.slice(0, 12).map((d) => ({ ...d }));
+
+  function makeCloud(containerId, spiralName) {
+    const svg = svgCloud(containerId);
+    cloud()
+      .size([W, H])
+      .words(words.map((d) => ({ ...d })))
+      .fontSize((d) => Math.sqrt(d.value) * 1.3)
+      .font("'Georgia', serif")
+      .rotate(() => (Math.random() < 0.5 ? 0 : 90))
+      .padding(4)
+      .spiral(spiralName)
+      .random(seeded(99))        // same seed → fair comparison
+      .on("end", (placed) => drawWords(svg, placed, (d, i) => palette(i)))
+      .start();
+  }
+
+  makeCloud("cloud-archimedean", "archimedean");
+  makeCloud("cloud-rectangular", "rectangular");
+
+  setCode("code-spirals", `
+import { cloud, spirals } from "./src/index.js";
+
+// Built-in spirals: "archimedean" (default) and "rectangular".
+cloud().spiral("archimedean") /* ... */ .start();
+cloud().spiral("rectangular") /* ... */ .start();
+
+// Custom spiral factory — receives size, returns t => [dx, dy].
+cloud().spiral((size) => {
+  const r = Math.min(size[0], size[1]) / 2;
+  return (t) => [
+    r * Math.cos(t * 0.2) * (t * 0.01),
+    r * Math.sin(t * 0.2) * (t * 0.01),
+  ];
+}).start();
+
+// Export the spiral functions directly for advanced use:
+const { archimedean, rectangular } = spirals;
+`);
+})();
+
+// ─── 4. Rotation modes ────────────────────────────────────────────────────────
+
+(function demoRotation() {
+  const words = techWords.slice(0, 14).map((d) => ({ ...d }));
+
+  const configs = [
+    { id: "cloud-rot-0",    rotate: () => 0,                        label: "Horizontal only" },
+    { id: "cloud-rot-90",   rotate: (d, i) => (i % 3 === 0 ? 90 : 0), label: "0° and 90°" },
+    { id: "cloud-rot-rand", rotate: () => (Math.floor(Math.random() * 7) - 3) * 15, label: "Random ±45°" },
+  ];
+
+  for (const cfg of configs) {
+    const svg = svgCloud(cfg.id);
+    cloud()
+      .size([W, H])
+      .words(words.map((d) => ({ ...d })))
+      .fontSize((d) => Math.sqrt(d.value) * 1.3)
+      .font("'Verdana', sans-serif")
+      .padding(3)
+      .rotate(cfg.rotate)
+      .random(seeded(7))
+      .on("end", (placed) => drawWords(svg, placed, (d, i) => coolPal(i)))
+      .start();
+  }
+
+  setCode("code-rotation", `
+// Rotation accessor receives (datum, index) and returns degrees.
+
+// All horizontal
+cloud().rotate(0).start();
+
+// Every third word is vertical
+cloud().rotate((d, i) => i % 3 === 0 ? 90 : 0).start();
+
+// Random multiples of 15°
+cloud().rotate(() =>
+  (Math.floor(Math.random() * 7) - 3) * 15
+).start();
+
+// Classic Jason Davies default: ±30° and ±60°
+cloud().rotate(() =>
+  (~~(Math.random() * 6) - 3) * 30
+).start();
+`);
+})();
+
+// ─── 5. Color & font ──────────────────────────────────────────────────────────
+
+(function demoColor() {
+  const svg = svgCloud("cloud-color");
+
+  const sizeScale = d3.scaleLinear()
+    .domain([0, d3.max(techWords, (d) => d.value)])
+    .range([12, 72]);
+
+  // Colour by font size — larger words get a deeper blue.
+  const colorScale = d3.scaleSequential(d3.interpolateBlues)
+    .domain([0, d3.max(techWords, (d) => d.value)]);
+
+  cloud()
+    .size([W, H])
+    .words(techWords.map((d) => ({ ...d })))
+    .fontSize((d) => sizeScale(d.value))
+    .font("'Helvetica Neue', Arial, sans-serif")
+    .fontWeight((d) => d.value > 1000 ? "bold" : "normal")
+    .rotate(() => (Math.random() < 0.7 ? 0 : 90))
+    .padding(4)
+    .on("end", (placed) => {
+      drawWords(svg, placed, (d) => colorScale(d.value));
+    })
+    .start();
+
+  setCode("code-color", `
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+import { cloud } from "./src/index.js";
+
+const sizeScale = d3.scaleLinear()
+  .domain([0, d3.max(words, (d) => d.value)])
+  .range([12, 72]);
+
+// Sequential colour scale: larger words → deeper blue.
+const colorScale = d3.scaleSequential(d3.interpolateBlues)
+  .domain([0, d3.max(words, (d) => d.value)]);
+
+cloud()
+  .size([500, 300])
+  .words(words)
+  .fontSize((d) => sizeScale(d.value))
+  .font("'Helvetica Neue', Arial, sans-serif")
+  .fontWeight((d) => d.value > 1000 ? "bold" : "normal")
+  .rotate(() => Math.random() < 0.7 ? 0 : 90)
+  .padding(4)
+  .on("end", (placed) => {
+    svg.selectAll("text")
+      .data(placed)
+      .join("text")
+      /* … position attributes … */
+      .style("fill", (d) => colorScale(d.value));
+      // Any D3 scale works: schemeTableau10, interpolateRainbow, etc.
+  })
+  .start();
+`);
+})();
+
+// ─── Install section code ─────────────────────────────────────────────────────
+
+setCode("install-esm", `
+// ESM (bundler or import map)
+import { cloud } from "d3-wordcloud";
+
+// ESM directly in browser (import map required for d3-dispatch)
+// <script type="importmap">
+// { "imports": { "d3-dispatch": "https://cdn.jsdelivr.net/npm/d3-dispatch@3/+esm" } }
+// </script>
+import { cloud } from "./node_modules/d3-wordcloud/src/index.js";
+
+// UMD via CDN — adds d3.cloud to the global d3 object
+// <script src="https://cdn.jsdelivr.net/npm/d3-wordcloud/dist/d3-wordcloud.min.js"></script>
+// const layout = d3.cloud();
+`);
+
+// ─── Syntax highlighting ──────────────────────────────────────────────────────
+
+// Trim indentation from template-literal code strings before highlighting.
+function setCode(id, str) {
+  const lines = str.split("\n").filter((l) => l.trim().length > 0);
+  const indent = Math.min(...lines.map((l) => l.match(/^(\s*)/)[1].length));
+  const trimmed = str
+    .split("\n")
+    .map((l) => l.slice(indent))
+    .join("\n")
+    .trim();
+  const el = document.getElementById(id);
+  el.textContent = trimmed;
+  // hljs loaded as a regular <script> so it's available on the global object.
+  // eslint-disable-next-line no-undef
+  hljs.highlightElement(el);
+}
+</script>
+
+</body>
+</html>

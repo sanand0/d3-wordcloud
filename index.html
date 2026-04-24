@@ -223,6 +223,7 @@
   <a href="#install">Install</a>
   <a href="#demo-basic">Basic</a>
   <a href="#demo-incremental">Incremental</a>
+  <a href="#demo-dense">Dense</a>
   <a href="#demo-spirals">Spirals</a>
   <a href="#demo-rotation">Rotation</a>
   <a href="#demo-color">Color &amp; Font</a>
@@ -272,10 +273,20 @@
   </div>
 </section>
 
+<!-- ── Dense packing ─────────────────────────────────────────── -->
+<section id="demo-dense">
+  <h2>Dense packing — ~100 words</h2>
+  <p>A strongly skewed size distribution — a few large dominant terms and many small ones — produces the classic word-cloud look. Padding 1 and a compact sans-serif let ~100 items pack tightly.</p>
+  <div class="example" style="grid-template-columns:1fr;">
+    <div class="cloud-box" id="cloud-dense" style="min-height:380px"><span class="loading">Rendering…</span></div>
+    <pre><code id="code-dense" class="language-javascript"></code></pre>
+  </div>
+</section>
+
 <!-- ── Spirals ────────────────────────────────────────────────── -->
 <section id="demo-spirals">
   <h2>Spiral patterns</h2>
-  <p>Two built-in spiral strategies control how the layout searches for free positions. Both receive the same word list and random seed for a fair comparison.</p>
+  <p>Two built-in spiral strategies control how the layout searches outward from the centre. Words are uniform in size and coloured by placement order (purple → first, yellow → last), so the search path emerges as a colour gradient. A faint dashed line traces the raw mathematical spiral.</p>
   <div class="example" style="grid-template-columns: 1fr;">
     <div class="two-up">
       <div>
@@ -380,66 +391,56 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
-const W = 500, H = 300; // default cloud dimensions
+const W = 500, H = 300;   // standard cloud dimensions
+const WD = 720, HD = 420; // dense demo dimensions
 
-function svgCloud(containerId) {
+function svgCloud(containerId, w = W, h = H) {
   const el = document.getElementById(containerId);
   el.innerHTML = "";
   return d3.select(el).append("svg")
-    .attr("viewBox", `0 0 ${W} ${H}`)
+    .attr("viewBox", `0 0 ${w} ${h}`)
     .attr("width", "100%");
 }
 
-function drawWords(svg, placed, colorFn) {
+// Place words from the "end" event into an SVG with a fade-in.
+function drawWords(svg, placed, colorFn, w = W, h = H) {
   svg.selectAll("text")
     .data(placed, (d) => d.text)
     .join(
       (enter) => enter.append("text")
         .attr("text-anchor", "middle")
-        .attr("transform", (d) => `translate(${d.x + W / 2},${d.y + H / 2}) rotate(${d.rotate})`)
+        .attr("transform", (d) => `translate(${d.x + w / 2},${d.y + h / 2}) rotate(${d.rotate})`)
         .style("font-size",   (d) => `${d.size}px`)
         .style("font-family", (d) => d.font)
         .style("font-weight", (d) => d.weight)
-        .style("fill",        colorFn)
+        .style("fill", colorFn)
         .style("opacity", 0)
         .text((d) => d.text)
         .call((t) => t.transition().duration(400).style("opacity", 1))
     );
 }
 
-// Seeded LCG so spiral comparisons use identical randomness.
 function seeded(s = 42) {
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
 }
 
-// D3 colour scales used across demos.
-const palette   = d3.scaleOrdinal(d3.schemeTableau10);
-const coolPal   = d3.scaleOrdinal(d3.schemePastel1);
+const palette = d3.scaleOrdinal(d3.schemeTableau10);
+const coolPal = d3.scaleOrdinal(d3.schemePastel1);
 
-// ─── Word datasets ────────────────────────────────────────────────────────────
+// ─── Datasets ─────────────────────────────────────────────────────────────────
 
 const techWords = [
-  { text: "visualization", value: 2400 },
-  { text: "D3",            value: 2000 },
-  { text: "JavaScript",    value: 1800 },
-  { text: "SVG",           value: 1500 },
-  { text: "layout",        value: 1200 },
-  { text: "canvas",        value: 1000 },
-  { text: "word cloud",    value:  900 },
-  { text: "data",          value:  800 },
-  { text: "animation",     value:  700 },
-  { text: "incremental",   value:  650 },
-  { text: "spiral",        value:  600 },
-  { text: "collision",     value:  550 },
-  { text: "bitmap",        value:  500 },
-  { text: "font",          value:  450 },
-  { text: "rotate",        value:  400 },
-  { text: "placement",     value:  380 },
-  { text: "dispatch",      value:  350 },
-  { text: "ESM",           value:  320 },
+  { text: "visualization", value: 2400 }, { text: "D3",          value: 2000 },
+  { text: "JavaScript",    value: 1800 }, { text: "SVG",          value: 1500 },
+  { text: "layout",        value: 1200 }, { text: "canvas",       value: 1000 },
+  { text: "word cloud",    value:  900 }, { text: "data",         value:  800 },
+  { text: "animation",     value:  700 }, { text: "incremental",  value:  650 },
+  { text: "spiral",        value:  600 }, { text: "collision",    value:  550 },
+  { text: "bitmap",        value:  500 }, { text: "font",         value:  450 },
+  { text: "rotate",        value:  400 }, { text: "placement",    value:  380 },
+  { text: "dispatch",      value:  350 }, { text: "ESM",          value:  320 },
 ];
 
-// Words for the incremental demo, drip-fed in batches of 5.
 const incrPool = [
   { text: "JavaScript", value: 1600 }, { text: "Python",     value: 1500 },
   { text: "TypeScript", value: 1300 }, { text: "Rust",       value: 1200 },
@@ -458,18 +459,80 @@ const incrPool = [
   { text: "Fortran",    value:  240 }, { text: "BASIC",      value:  230 },
 ];
 
+// ~100 AI/ML terms spanning a 200× range of values — creates bold dominants
+// surrounded by many small supporting terms.
+const denseWords = [
+  { text: "intelligence",        value: 9800 }, { text: "learning",       value: 8900 },
+  { text: "neural",              value: 8100 }, { text: "data",           value: 7600 },
+  { text: "model",               value: 7100 },
+  { text: "training",            value: 5500 }, { text: "inference",      value: 5000 },
+  { text: "attention",           value: 4600 }, { text: "transformer",    value: 4200 },
+  { text: "gradient",            value: 3800 }, { text: "embedding",      value: 3500 },
+  { text: "language",            value: 3200 }, { text: "generation",     value: 2900 },
+  { text: "parameter",           value: 2700 }, { text: "weights",        value: 2500 },
+  { text: "backpropagation",     value: 2300 }, { text: "fine-tuning",    value: 2100 },
+  { text: "context window",      value: 1900 }, { text: "hallucination",  value: 1700 },
+  { text: "alignment",           value: 1600 }, { text: "reinforcement",  value: 1500 },
+  { text: "tokenization",        value: 1400 }, { text: "encoder",        value: 1300 },
+  { text: "decoder",             value: 1200 }, { text: "self-attention", value: 1100 },
+  { text: "prompt",              value: 1000 }, { text: "latent space",   value:  900 },
+  { text: "diffusion",           value:  850 }, { text: "multimodal",     value:  800 },
+  { text: "benchmark",           value:  750 }, { text: "perplexity",     value:  700 },
+  { text: "overfitting",         value:  650 }, { text: "epoch",          value:  600 },
+  { text: "dropout",             value:  580 }, { text: "activation",     value:  550 },
+  { text: "RLHF",                value:  490 }, { text: "BERT",           value:  470 },
+  { text: "GPT",                 value:  450 }, { text: "ResNet",         value:  430 },
+  { text: "batch norm",          value:  410 }, { text: "softmax",        value:  390 },
+  { text: "ReLU",                value:  370 }, { text: "LSTM",           value:  360 },
+  { text: "CNN",                 value:  350 }, { text: "GAN",            value:  340 },
+  { text: "VAE",                 value:  330 }, { text: "LoRA",           value:  320 },
+  { text: "CLIP",                value:  310 }, { text: "RAG",            value:  300 },
+  { text: "logits",              value:  290 }, { text: "recall",         value:  280 },
+  { text: "precision",           value:  270 }, { text: "F1 score",       value:  260 },
+  { text: "cross-entropy",       value:  250 }, { text: "vector store",   value:  245 },
+  { text: "top-k",               value:  240 }, { text: "temperature",    value:  235 },
+  { text: "bias",                value:  230 }, { text: "variance",       value:  225 },
+  { text: "zero-shot",           value:  210 }, { text: "few-shot",       value:  205 },
+  { text: "chain-of-thought",    value:  200 }, { text: "quantization",   value:  195 },
+  { text: "KV cache",            value:  185 }, { text: "MoE",            value:  180 },
+  { text: "Mamba",               value:  175 }, { text: "PEFT",           value:  170 },
+  { text: "adapter",             value:  165 }, { text: "sparsity",       value:  160 },
+  { text: "head",                value:  155 }, { text: "layer norm",     value:  150 },
+  { text: "residual",            value:  145 }, { text: "pooling",        value:  140 },
+  { text: "stride",              value:  138 }, { text: "kernel",         value:  135 },
+  { text: "ablation",            value:  130 }, { text: "perceptron",     value:  125 },
+  { text: "eigenvalue",          value:  120 }, { text: "Jacobian",       value:  118 },
+  { text: "KL divergence",       value:  115 }, { text: "BLEU",           value:  112 },
+  { text: "ROUGE",               value:  110 }, { text: "MMLU",           value:  108 },
+  { text: "HumanEval",           value:  106 }, { text: "GSM8K",          value:  104 },
+  { text: "HellaSwag",           value:  102 }, { text: "LoRA rank",      value:  100 },
+  { text: "flash attention",     value:   95 }, { text: "speculative decoding", value: 90 },
+  { text: "grouped query",       value:   86 }, { text: "rotary embedding", value:  83 },
+  { text: "causal mask",         value:   80 }, { text: "label smoothing", value:  77 },
+  { text: "warmup",              value:   74 }, { text: "cosine decay",   value:   70 },
+  { text: "positional encoding", value:   67 }, { text: "sliding window", value:   63 },
+  { text: "mixture of experts",  value:   60 }, { text: "constitutional AI", value: 56 },
+];
+
+// 40 short common words all at the same value — reveals the spiral path via
+// colour-coded placement order.
+const spiralWords = [
+  "the","be","to","of","and","a","in","that","have","it",
+  "for","not","on","with","he","as","you","do","at","this",
+  "but","his","by","from","they","we","say","her","she","or",
+  "an","will","my","one","all","would","there","their","what","so",
+].map((text) => ({ text, value: 100 }));
+
 // ─── 1. Basic word cloud ──────────────────────────────────────────────────────
 
 (function demoBasic() {
   const svg = svgCloud("cloud-basic");
-
   cloud()
     .size([W, H])
     .words(techWords.map((d) => ({ ...d })))
     .fontSize((d) => Math.sqrt(d.value) * 1.4)
     .font("Impact, sans-serif")
-    .rotate(0)
-    .padding(3)
+    .rotate(0).padding(3)
     .on("end", (placed) => drawWords(svg, placed, (d, i) => palette(i)))
     .start();
 
@@ -479,7 +542,6 @@ import { cloud } from "./src/index.js";
 const words = [
   { text: "visualization", value: 2400 },
   { text: "D3",            value: 2000 },
-  { text: "JavaScript",    value: 1800 },
   // … more words
 ];
 
@@ -488,10 +550,10 @@ cloud()
   .words(words)
   .fontSize((d) => Math.sqrt(d.value) * 1.4)
   .font("Impact, sans-serif")
-  .rotate(0)         // all horizontal
+  .rotate(0)
   .padding(3)
   .on("end", (placed) => {
-    // place SVG <text> elements using placed[i].{x, y, rotate, size, font}
+    // x, y are centre-relative; shift by W/2, H/2 for SVG coords
     svg.selectAll("text")
       .data(placed)
       .join("text")
@@ -508,6 +570,9 @@ cloud()
 })();
 
 // ─── 2. Incremental animation ─────────────────────────────────────────────────
+// After the src/index.js fix, "word" fires with centre-relative x/y — the same
+// coordinate system as the "end" event — so translate(d.x + W/2, d.y + H/2)
+// is correct in both handlers.
 
 (function demoIncremental() {
   let layout = null;
@@ -525,19 +590,22 @@ cloud()
       .fontSize((d) => Math.sqrt(d.value) * 1.5)
       .font("'Trebuchet MS', sans-serif")
       .padding(4)
-      // "word" fires once per placed word — ideal for per-word animation.
       .on("word", (d) => {
+        const cx = d.x + W / 2, cy = d.y + H / 2;
+        // Scale from 0 at the word's final position — a minimal "pop" entry.
         svgEl.append("text")
           .datum(d)
           .attr("text-anchor", "middle")
-          .attr("transform",
-            `translate(${d.x + W / 2},${d.y + H / 2}) rotate(${d.rotate})`)
+          .attr("transform", `translate(${cx},${cy}) rotate(${d.rotate}) scale(0.1)`)
           .style("font-size",   `${d.size}px`)
           .style("font-family", d.font)
           .style("fill",        palette(d.text))
           .style("opacity",     0)
           .text(d.text)
-          .transition().duration(500)
+          .transition()
+          .duration(380)
+          .ease(d3.easeCubicOut)
+          .attr("transform", `translate(${cx},${cy}) rotate(${d.rotate}) scale(1)`)
           .style("opacity", 1);
       });
   }
@@ -555,60 +623,140 @@ cloud()
   document.getElementById("btn-add").addEventListener("click", addBatch);
   document.getElementById("btn-reset").addEventListener("click", () => {
     if (layout) { layout.stop(); layout = null; }
-    svgEl = null;
-    cursor = 0;
+    svgEl = null; cursor = 0;
     document.getElementById("word-count").textContent = "";
     document.getElementById("cloud-incremental").innerHTML =
       '<span class="loading">Click "Add 5 words" to begin</span>';
   });
 
   setCode("code-incremental", `
-import { cloud } from "./src/index.js";
-
-// Build a layout once — re-use across add() calls.
+// "word" fires with centre-relative x/y (same as "end").
+// Scale from 0.1 → 1 at the final position for a clean pop-in.
 const layout = cloud()
   .size([500, 300])
-  .fontSize((d) => Math.sqrt(d.value) * 1.5)
-  .padding(4)
-  // "word" fires for every newly placed word.
   .on("word", (d) => {
+    const cx = d.x + W / 2, cy = d.y + H / 2;
     svg.append("text")
-      .datum(d)
-      // ... position and style ...
+      .attr("transform",
+        \`translate(\${cx},\${cy}) rotate(\${d.rotate}) scale(0.1)\`)
       .style("opacity", 0)
-      .transition().duration(500)
-      .style("opacity", 1);  // fade-in animation
+      .text(d.text)
+      .transition().duration(380).ease(d3.easeCubicOut)
+      .attr("transform",
+        \`translate(\${cx},\${cy}) rotate(\${d.rotate}) scale(1)\`)
+      .style("opacity", 1);
   });
 
-// First batch — initialises the board.
-layout.words(firstFive).start();
-
-// Later, add more words without disturbing existing ones.
-layout.add(nextFive);
-layout.add(moreWords);
-
-// Reset to an empty board.
-layout.clear().words([]).start();
+layout.words(firstBatch).start();  // initialise board
+layout.add(nextBatch);             // extend without moving existing words
+layout.add(moreBatch);
+layout.clear().start();            // reset and rebuild
 `);
 })();
 
-// ─── 3. Spiral comparison ─────────────────────────────────────────────────────
+// ─── 3. Dense packing ────────────────────────────────────────────────────────
+
+(function demoDense() {
+  const svg = svgCloud("cloud-dense", WD, HD);
+
+  const sizeScale = d3.scalePow().exponent(0.42)
+    .domain([56, 9800]).range([7, 62]).clamp(true);
+
+  // Map log-value to a vibrant hue range: large=warm, small=cool.
+  const colorScale = d3.scaleSequential(d3.interpolateRainbow)
+    .domain([Math.log(9800), Math.log(56)]);
+
+  cloud()
+    .size([WD, HD])
+    .words(denseWords.map((d) => ({ ...d })))
+    .fontSize((d) => sizeScale(d.value))
+    .font("'Arial Narrow', Arial, sans-serif")
+    .fontWeight((d) => d.value > 2000 ? "bold" : "normal")
+    .rotate((d) => d.value > 1000 ? 0 : (Math.random() < 0.6 ? 0 : 90))
+    .padding(1)
+    .on("end", (placed) =>
+      drawWords(svg, placed, (d) => colorScale(Math.log(d.value)), WD, HD))
+    .start();
+
+  setCode("code-dense", `
+// Power-law size mapping: a few huge terms, many tiny ones.
+const sizeScale = d3.scalePow().exponent(0.42)
+  .domain([56, 9800]).range([7, 62]);
+
+// Colour by log-value so the full rainbow spans the range.
+const colorScale = d3.scaleSequential(d3.interpolateRainbow)
+  .domain([Math.log(9800), Math.log(56)]);
+
+cloud()
+  .size([720, 420])
+  .words(hundredWords)           // ~100 items, values 56 – 9800
+  .fontSize((d) => sizeScale(d.value))
+  .font("'Arial Narrow', Arial, sans-serif")
+  .fontWeight((d) => d.value > 2000 ? "bold" : "normal")
+  // Large words stay horizontal; smaller ones may rotate.
+  .rotate((d) => d.value > 1000 ? 0 : (Math.random() < 0.6 ? 0 : 90))
+  .padding(1)                    // tight packing
+  .on("end", (placed) => {
+    svg.selectAll("text").data(placed).join("text")
+      /* … position … */
+      .style("fill", (d) => colorScale(Math.log(d.value)));
+  })
+  .start();
+`);
+})();
+
+// ─── 4. Spiral patterns ───────────────────────────────────────────────────────
+// Uniform-size words + colour-by-placement-order + the raw spiral path
+// drawn as a dashed line make each strategy's geometry unmistakable.
 
 (function demoSpirals() {
-  const words = techWords.slice(0, 12).map((d) => ({ ...d }));
-
   function makeCloud(containerId, spiralName) {
     const svg = svgCloud(containerId);
+
+    // Draw the raw mathematical spiral path for visual reference.
+    const rng0 = seeded(42);
+    const sf = spirals[spiralName]([W, H]);
+    const pts = [];
+    for (let t = 1; t <= 600; t += 2) {
+      const [dx, dy] = sf(t);
+      const x = W / 2 + dx, y = H / 2 + dy;
+      if (x < -10 || x > W + 10 || y < -10 || y > H + 10) break;
+      pts.push([x, y]);
+    }
+    svg.append("path")
+      .attr("d", d3.line()(pts))
+      .attr("fill", "none")
+      .attr("stroke", "#d1d5db")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "4 3");
+
+    // Colour by placement index: purple (first/centre) → yellow (last/edge).
+    const orderColor = d3.scaleSequential(d3.interpolatePlasma)
+      .domain([0, spiralWords.length - 1]);
+
     cloud()
       .size([W, H])
-      .words(words.map((d) => ({ ...d })))
-      .fontSize((d) => Math.sqrt(d.value) * 1.3)
-      .font("'Georgia', serif")
-      .rotate(() => (Math.random() < 0.5 ? 0 : 90))
-      .padding(4)
+      .words(spiralWords.map((d) => ({ ...d })))
+      .fontSize(() => 13)          // uniform size — reveals the pattern
+      .font("'Courier New', monospace")
+      .rotate(0)                   // all horizontal — clean grid-like layout
+      .padding(2)
       .spiral(spiralName)
-      .random(seeded(99))        // same seed → fair comparison
-      .on("end", (placed) => drawWords(svg, placed, (d, i) => palette(i)))
+      .random(seeded(42))          // same seed for fair side-by-side
+      .on("end", (placed) => {
+        svg.selectAll("text")
+          .data(placed)
+          .join("text")
+          .attr("text-anchor", "middle")
+          .attr("transform", (d) => `translate(${d.x + W / 2},${d.y + H / 2})`)
+          .style("font-size", "13px")
+          .style("font-family", "'Courier New', monospace")
+          .style("font-weight", "bold")
+          .style("fill", (d, i) => orderColor(i))
+          .style("opacity", 0)
+          .text((d) => d.text)
+          .transition().duration(300).style("opacity", 1);
+      })
       .start();
   }
 
@@ -618,123 +766,105 @@ layout.clear().words([]).start();
   setCode("code-spirals", `
 import { cloud, spirals } from "./src/index.js";
 
-// Built-in spirals: "archimedean" (default) and "rectangular".
-cloud().spiral("archimedean") /* ... */ .start();
-cloud().spiral("rectangular") /* ... */ .start();
+// Colour words by their placement index to trace the search path.
+const orderColor = d3.scaleSequential(d3.interpolatePlasma)
+  .domain([0, words.length - 1]);
 
-// Custom spiral factory — receives size, returns t => [dx, dy].
+cloud()
+  .spiral("archimedean")  // or "rectangular"
+  .on("end", (placed) => {
+    svg.selectAll("text").data(placed).join("text")
+      .style("fill", (d, i) => orderColor(i));
+  })
+  .start();
+
+// Draw the raw spiral path for overlay:
+const sf = spirals.archimedean([W, H]);
+const pts = Array.from({length: 300}, (_, i) => {
+  const [dx, dy] = sf(i * 2 + 1);
+  return [W/2 + dx, H/2 + dy];
+});
+svg.append("path").attr("d", d3.line()(pts))
+  .attr("stroke", "#d1d5db").attr("fill", "none");
+
+// Custom spiral factory:
 cloud().spiral((size) => {
-  const r = Math.min(size[0], size[1]) / 2;
-  return (t) => [
-    r * Math.cos(t * 0.2) * (t * 0.01),
-    r * Math.sin(t * 0.2) * (t * 0.01),
-  ];
+  return (t) => [Math.cos(t * 0.2) * t * 0.8, Math.sin(t * 0.2) * t * 0.8];
 }).start();
-
-// Export the spiral functions directly for advanced use:
-const { archimedean, rectangular } = spirals;
 `);
 })();
 
-// ─── 4. Rotation modes ────────────────────────────────────────────────────────
+// ─── 5. Rotation modes ────────────────────────────────────────────────────────
 
 (function demoRotation() {
   const words = techWords.slice(0, 14).map((d) => ({ ...d }));
-
-  const configs = [
-    { id: "cloud-rot-0",    rotate: () => 0,                        label: "Horizontal only" },
-    { id: "cloud-rot-90",   rotate: (d, i) => (i % 3 === 0 ? 90 : 0), label: "0° and 90°" },
-    { id: "cloud-rot-rand", rotate: () => (Math.floor(Math.random() * 7) - 3) * 15, label: "Random ±45°" },
+  const cfgs = [
+    { id: "cloud-rot-0",    rotate: () => 0 },
+    { id: "cloud-rot-90",   rotate: (d, i) => (i % 3 === 0 ? 90 : 0) },
+    { id: "cloud-rot-rand", rotate: () => (Math.floor(Math.random() * 7) - 3) * 15 },
   ];
-
-  for (const cfg of configs) {
+  for (const cfg of cfgs) {
     const svg = svgCloud(cfg.id);
     cloud()
-      .size([W, H])
-      .words(words.map((d) => ({ ...d })))
+      .size([W, H]).words(words.map((d) => ({ ...d })))
       .fontSize((d) => Math.sqrt(d.value) * 1.3)
-      .font("'Verdana', sans-serif")
-      .padding(3)
-      .rotate(cfg.rotate)
-      .random(seeded(7))
+      .font("'Verdana', sans-serif").padding(3)
+      .rotate(cfg.rotate).random(seeded(7))
       .on("end", (placed) => drawWords(svg, placed, (d, i) => coolPal(i)))
       .start();
   }
-
   setCode("code-rotation", `
-// Rotation accessor receives (datum, index) and returns degrees.
+// Rotation accessor: (datum, index) → degrees.
 
-// All horizontal
-cloud().rotate(0).start();
+cloud().rotate(0).start();                            // horizontal only
 
-// Every third word is vertical
-cloud().rotate((d, i) => i % 3 === 0 ? 90 : 0).start();
+cloud().rotate((d, i) => i % 3 === 0 ? 90 : 0)      // 0° / 90° mix
+  .start();
 
-// Random multiples of 15°
-cloud().rotate(() =>
+cloud().rotate(() =>                                   // random multiples of 15°
   (Math.floor(Math.random() * 7) - 3) * 15
 ).start();
 
-// Classic Jason Davies default: ±30° and ±60°
-cloud().rotate(() =>
+cloud().rotate(() =>                                   // classic ±30° / ±60°
   (~~(Math.random() * 6) - 3) * 30
 ).start();
 `);
 })();
 
-// ─── 5. Color & font ──────────────────────────────────────────────────────────
+// ─── 6. Color & font ──────────────────────────────────────────────────────────
 
 (function demoColor() {
   const svg = svgCloud("cloud-color");
-
-  const sizeScale = d3.scaleLinear()
-    .domain([0, d3.max(techWords, (d) => d.value)])
-    .range([12, 72]);
-
-  // Colour by font size — larger words get a deeper blue.
-  const colorScale = d3.scaleSequential(d3.interpolateBlues)
-    .domain([0, d3.max(techWords, (d) => d.value)]);
+  const sizeScale  = d3.scaleLinear().domain([0, d3.max(techWords, (d) => d.value)]).range([12, 72]);
+  const colorScale = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(techWords, (d) => d.value)]);
 
   cloud()
-    .size([W, H])
-    .words(techWords.map((d) => ({ ...d })))
+    .size([W, H]).words(techWords.map((d) => ({ ...d })))
     .fontSize((d) => sizeScale(d.value))
     .font("'Helvetica Neue', Arial, sans-serif")
     .fontWeight((d) => d.value > 1000 ? "bold" : "normal")
-    .rotate(() => (Math.random() < 0.7 ? 0 : 90))
-    .padding(4)
-    .on("end", (placed) => {
-      drawWords(svg, placed, (d) => colorScale(d.value));
-    })
+    .rotate(() => (Math.random() < 0.7 ? 0 : 90)).padding(4)
+    .on("end", (placed) => drawWords(svg, placed, (d) => colorScale(d.value)))
     .start();
 
   setCode("code-color", `
-import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
-import { cloud } from "./src/index.js";
-
 const sizeScale = d3.scaleLinear()
-  .domain([0, d3.max(words, (d) => d.value)])
-  .range([12, 72]);
+  .domain([0, d3.max(words, (d) => d.value)]).range([12, 72]);
 
-// Sequential colour scale: larger words → deeper blue.
+// Larger words → deeper blue.
 const colorScale = d3.scaleSequential(d3.interpolateBlues)
   .domain([0, d3.max(words, (d) => d.value)]);
 
 cloud()
-  .size([500, 300])
-  .words(words)
   .fontSize((d) => sizeScale(d.value))
-  .font("'Helvetica Neue', Arial, sans-serif")
   .fontWeight((d) => d.value > 1000 ? "bold" : "normal")
   .rotate(() => Math.random() < 0.7 ? 0 : 90)
   .padding(4)
   .on("end", (placed) => {
-    svg.selectAll("text")
-      .data(placed)
-      .join("text")
-      /* … position attributes … */
+    svg.selectAll("text").data(placed).join("text")
+      /* … position … */
       .style("fill", (d) => colorScale(d.value));
-      // Any D3 scale works: schemeTableau10, interpolateRainbow, etc.
+    // Any D3 scale: schemeTableau10, interpolateRainbow, etc.
   })
   .start();
 `);
@@ -759,20 +889,12 @@ import { cloud } from "./node_modules/d3-wordcloud/src/index.js";
 
 // ─── Syntax highlighting ──────────────────────────────────────────────────────
 
-// Trim indentation from template-literal code strings before highlighting.
 function setCode(id, str) {
   const lines = str.split("\n").filter((l) => l.trim().length > 0);
   const indent = Math.min(...lines.map((l) => l.match(/^(\s*)/)[1].length));
-  const trimmed = str
-    .split("\n")
-    .map((l) => l.slice(indent))
-    .join("\n")
-    .trim();
   const el = document.getElementById(id);
-  el.textContent = trimmed;
-  // hljs loaded as a regular <script> so it's available on the global object.
-  // eslint-disable-next-line no-undef
-  hljs.highlightElement(el);
+  el.textContent = str.split("\n").map((l) => l.slice(indent)).join("\n").trim();
+  hljs.highlightElement(el); // hljs is loaded as a plain <script> above
 }
 </script>
 

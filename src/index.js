@@ -101,12 +101,12 @@ export function cloud() {
         if (d.hasText && placeWord(d, board, sw)) {
           _placed.push(d);
           batchPlaced.push(d);
-          event.call("word", cloud, d);
           if (_bounds) cloudBounds(_bounds, d);
           else _bounds = [{ x: d.x + d.x0, y: d.y + d.y0 }, { x: d.x + d.x1, y: d.y + d.y1 }];
-          // Shift to centre-relative coordinates for the caller.
+          // Shift to centre-relative coordinates before notifying callers.
           d.x -= size[0] >> 1;
           d.y -= size[1] >> 1;
+          event.call("word", cloud, d);
         }
       }
       if (i >= n) {

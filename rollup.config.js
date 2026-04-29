@@ -19,6 +19,14 @@ export default [
     ...base,
     output: {
       file: `dist/${pkg.name}.js`,
+      format: "es",
+      banner,
+    },
+  },
+  {
+    ...base,
+    output: {
+      file: `dist/${pkg.name}.umd.js`,
       format: "umd",
       name: "d3",
       extend: true, // merges exports into any existing "d3" global

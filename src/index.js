@@ -31,6 +31,59 @@ function rectangularSpiral(size) {
 
 export const spirals = { archimedean: archimedeanSpiral, rectangular: rectangularSpiral };
 
+export function renderWords(selection, words, options = {}) {
+  const {
+    width = 0,
+    height = 0,
+    key = (d, i) => d.id ?? d.text ?? i,
+    text = (d) => d.text,
+    x = (d) => d.x,
+    y = (d) => d.y,
+    rotate = (d) => d.rotate ?? 0,
+    font = (d) => d.font ?? "serif",
+    fontStyle = (d) => d.style ?? "normal",
+    fontWeight = (d) => d.weight ?? "normal",
+    fontSize = (d) => d.size ?? 0,
+    fill = () => "currentColor",
+    opacity = 1,
+    className = null,
+    title = null,
+    attrs = null,
+    styles = null,
+  } = options;
+
+  const labels = selection
+    .selectAll("text")
+    .data(words, key)
+    .join("text")
+    .attr("text-anchor", "middle");
+
+  labels
+    .attr("class", className == null ? null : accessor(className))
+    .attr("transform", (d, i) => {
+      const tx = +x(d, i) + width / 2;
+      const ty = +y(d, i) + height / 2;
+      return `translate(${tx},${ty}) rotate(${+rotate(d, i) || 0})`;
+    })
+    .style("font-family", font)
+    .style("font-size", (d, i) => `${fontSize(d, i)}px`)
+    .style("font-style", fontStyle)
+    .style("font-weight", fontWeight)
+    .style("fill", fill)
+    .style("opacity", opacity)
+    .text(text);
+
+  if (attrs) applyMap(labels, "attr", attrs);
+  if (styles) applyMap(labels, "style", styles);
+
+  labels.selectAll("title")
+    .data(title == null ? [] : (d, i) => [title(d, i)])
+    .join("title")
+    .text((d) => d);
+
+  return labels;
+}
+
 export function cloud() {
   // Configuration (all stored as functions via constant()).
   let size = [256, 256];
@@ -52,6 +105,7 @@ export function cloud() {
   let _bounds = null; // [{x,y}, {x,y}] bounding box of placed words
   let _placed = [];   // all successfully placed word datums
   let _timer  = null;
+  let _promiseId = 0;
 
   const event = dispatch("word", "end");
 
@@ -208,6 +262,18 @@ export function cloud() {
       return _placed.slice();
     },
 
+    bounds() {
+      return copyBounds(_bounds);
+    },
+
+    startAsync() {
+      return waitForEnd(() => cloud.start());
+    },
+
+    addAsync(newWords) {
+      return waitForEnd(() => cloud.add(newWords));
+    },
+
     // — Configuration (all chainable) ——————————————————————————
 
     words(_)        { return _ !== undefined ? (words = _, cloud) : words; },
@@ -230,6 +296,26 @@ export function cloud() {
     },
   };
 
+  function waitForEnd(action) {
+    return new Promise((resolve, reject) => {
+      const name = `promise-${++_promiseId}`;
+      const endEvent = `end.${name}`;
+      const cleanup = () => event.on(endEvent, null);
+
+      event.on(endEvent, (placed, bounds) => {
+        cleanup();
+        resolve({ words: placed, bounds: copyBounds(bounds), layout: cloud });
+      });
+
+      try {
+        action();
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
+  }
+
   return cloud;
 }
 
@@ -237,6 +323,20 @@ export function cloud() {
 
 function constant(v) {
   return typeof v === "function" ? v : () => v;
+}
+
+function accessor(v) {
+  return typeof v === "function" ? v : () => v;
+}
+
+function applyMap(selection, method, map) {
+  for (const [name, value] of Object.entries(map)) {
+    selection[method](name, accessor(value));
+  }
+}
+
+function copyBounds(bounds) {
+  return bounds ? bounds.map((point) => ({ ...point })) : null;
 }
 
 function defaultCanvas() {

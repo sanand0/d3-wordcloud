@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cloud, spirals } from "../src/index.js";
+import { cloud, renderWords, spirals } from "../src/index.js";
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 // Returns a canvas whose context reports every pixel as "lit" (red channel = 128).
@@ -41,12 +41,86 @@ function run(c) {
   });
 }
 
+function mockSelection() {
+  const nodes = [];
+
+  function createSelection(getNodes) {
+    return {
+      selectAll(selector) {
+        if (selector === "title") {
+          return createTitleSelection(getNodes);
+        }
+        return createDataSelection(nodes);
+      },
+      attr(name, value) {
+        for (const [index, node] of getNodes().entries()) {
+          node.attrs[name] = typeof value === "function" ? value(node.datum, index) : value;
+        }
+        return this;
+      },
+      style(name, value) {
+        for (const [index, node] of getNodes().entries()) {
+          node.styles[name] = typeof value === "function" ? value(node.datum, index) : value;
+        }
+        return this;
+      },
+      text(value) {
+        for (const [index, node] of getNodes().entries()) {
+          node.text = typeof value === "function" ? value(node.datum, index) : value;
+        }
+        return this;
+      },
+    };
+  }
+
+  function createDataSelection(store) {
+    return {
+      data(data) {
+        store.length = 0;
+        for (const datum of data) {
+          store.push({ datum, attrs: {}, styles: {}, text: "", titles: [] });
+        }
+        return this;
+      },
+      join() {
+        return createSelection(() => store);
+      },
+    };
+  }
+
+  function createTitleSelection(getNodes) {
+    return {
+      data(values) {
+        const source = getNodes();
+        for (const [index, node] of source.entries()) {
+          node.titles = typeof values === "function" ? values(node.datum, index) : values;
+        }
+        return this;
+      },
+      join() {
+        return {
+          text(value) {
+            for (const [index, node] of getNodes().entries()) {
+              node.titles = node.titles.map((entry) =>
+                typeof value === "function" ? value(entry, index) : value,
+              );
+            }
+            return this;
+          },
+        };
+      },
+    };
+  }
+
+  return { selection: createSelection(() => nodes), nodes };
+}
+
 // ─── API shape ────────────────────────────────────────────────────────────────
 
 test("cloud() returns an object with all public methods", () => {
   const c = cloud();
   for (const m of [
-    "start", "stop", "add", "clear", "placed", "on",
+    "start", "stop", "add", "clear", "placed", "bounds", "startAsync", "addAsync", "on",
     "words", "size", "font", "fontStyle", "fontWeight", "fontSize",
     "rotate", "text", "padding", "spiral", "random", "timeInterval", "canvas",
   ]) {
@@ -111,6 +185,23 @@ test("start() places words and fires end event", async () => {
   const placed = await promise;
 
   assert.ok(placed.length > 0, "at least one word should be placed");
+});
+
+test("startAsync() resolves with the placed words and bounds", async () => {
+  const c = cloud()
+    .size([400, 400])
+    .canvas(mockCanvas)
+    .words([
+      { text: "alpha", value: 100 },
+      { text: "beta", value: 60 },
+    ])
+    .timeInterval(Infinity);
+
+  const result = await c.startAsync();
+
+  assert.equal(result.layout, c);
+  assert.equal(result.words.length, c.placed().length);
+  assert.deepEqual(result.bounds, c.bounds());
 });
 
 test("start() fires word event for each placed word", async () => {
@@ -231,6 +322,23 @@ test("add() accumulates placed() across multiple calls", async () => {
   assert.ok(c.placed().length >= afterStart, "placed() should grow after add()");
 });
 
+test("addAsync() resolves after incrementally placing a batch", async () => {
+  const c = cloud()
+    .size([800, 800])
+    .canvas(mockCanvas)
+    .words([{ text: "first", value: 90 }])
+    .fontSize(() => 24)
+    .timeInterval(Infinity);
+
+  const before = (await c.startAsync()).words.length;
+  const result = await c.addAsync([{ text: "second", value: 70 }]);
+
+  assert.equal(result.layout, c);
+  assert.ok(Array.isArray(result.words));
+  assert.deepEqual(result.bounds, c.bounds());
+  assert.ok(c.placed().length >= before);
+});
+
 // ─── clear() ─────────────────────────────────────────────────────────────────
 
 test("clear() resets placed list so start() rebuilds from scratch", async () => {
@@ -255,9 +363,24 @@ test("clear() resets placed list so start() rebuilds from scratch", async () => 
   assert.ok(c.placed().length > 0, "start() after clear() should place words");
 });
 
+test("bounds() returns a defensive copy of the current bounds", async () => {
+  const c = cloud()
+    .size([400, 400])
+    .canvas(mockCanvas)
+    .words([{ text: "one", value: 80 }])
+    .timeInterval(Infinity);
+
+  await c.startAsync();
+  const bounds = c.bounds();
+
+  assert.ok(bounds);
+  bounds[0].x = 99999;
+  assert.notEqual(c.bounds()[0].x, 99999);
+});
+
 // ─── stop() ──────────────────────────────────────────────────────────────────
 
-test("stop() halts an in-progress layout", (t, done) => {
+test("stop() halts an in-progress layout", async () => {
   let endFired = false;
   const c = cloud()
     .size([400, 400])
@@ -270,10 +393,8 @@ test("stop() halts an in-progress layout", (t, done) => {
   c.stop(); // stop immediately
 
   // Wait a tick to confirm "end" was not fired after stop()
-  setTimeout(() => {
-    assert.equal(endFired, false, "end should not fire after stop()");
-    done();
-  }, 50);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(endFired, false, "end should not fire after stop()");
 });
 
 // ─── Spiral patterns ─────────────────────────────────────────────────────────
@@ -333,4 +454,45 @@ test("seeded random produces identical layouts on repeated runs", async () => {
     assert.equal(a[i].x, b[i].x, `x differs for "${a[i].text}"`);
     assert.equal(a[i].y, b[i].y, `y differs for "${a[i].text}"`);
   }
+});
+
+test("renderWords() binds positioned text nodes onto a D3-like selection", () => {
+  const { selection, nodes } = mockSelection();
+  const words = [
+    {
+      id: "alpha",
+      text: "Alpha",
+      x: 10,
+      y: -5,
+      rotate: 15,
+      size: 24,
+      font: "Inter",
+      style: "italic",
+      weight: "700",
+      fill: "#3366ff",
+    },
+  ];
+
+  const result = renderWords(selection, words, {
+    width: 400,
+    height: 200,
+    key: (d) => d.id,
+    fill: (d) => d.fill,
+    title: (d) => `${d.text}:${d.size}`,
+    attrs: { "data-id": (d) => d.id },
+    styles: { cursor: "pointer" },
+  });
+
+  assert.equal(typeof result.attr, "function");
+  assert.equal(nodes.length, 1);
+  assert.equal(nodes[0].text, "Alpha");
+  assert.equal(nodes[0].attrs.transform, "translate(210,95) rotate(15)");
+  assert.equal(nodes[0].attrs["data-id"], "alpha");
+  assert.equal(nodes[0].styles["font-family"], "Inter");
+  assert.equal(nodes[0].styles["font-style"], "italic");
+  assert.equal(nodes[0].styles["font-weight"], "700");
+  assert.equal(nodes[0].styles["font-size"], "24px");
+  assert.equal(nodes[0].styles.fill, "#3366ff");
+  assert.equal(nodes[0].styles.cursor, "pointer");
+  assert.deepEqual(nodes[0].titles, ["Alpha:24"]);
 });

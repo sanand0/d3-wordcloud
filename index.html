@@ -3,900 +3,2574 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>d3-wordcloud — modern D3 word cloud layout</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-
-  <!-- d3-dispatch bare specifier needed by src/index.js -->
+  <title>d3-wordcloud — Interactive Demo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%234f46e5'/%3E%3Ctext x='50%25' y='54%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial,sans-serif' font-size='28' font-weight='700' fill='white'%3Ed3%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script type="importmap">
-  { "imports": { "d3-dispatch": "https://cdn.jsdelivr.net/npm/d3-dispatch@3/+esm" } }
+  {
+    "imports": {
+      "d3-dispatch": "https://cdn.jsdelivr.net/npm/d3-dispatch@3/+esm"
+    }
+  }
   </script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #f8f9fb;
+      --bg: #f0f4fa;
       --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #1a202c;
+      --surface-2: #f7f9fc;
+      --border: rgba(15, 23, 42, 0.1);
+      --text: #0f172a;
       --muted: #64748b;
-      --accent: #3b82f6;
-      --accent-dark: #1d4ed8;
-      --code-bg: #0d1117;
-      --radius: 8px;
-      --gap: 2rem;
+      --accent: #4f46e5;
+      --accent-2: #7c3aed;
+      --teal: #0d9488;
+      --rose: #e11d48;
+      --amber: #d97706;
+      --sky: #0284c7;
+      --radius: 12px;
+      --shadow-sm: 0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04);
+      --shadow: 0 4px 16px rgba(15,23,42,0.1), 0 2px 4px rgba(15,23,42,0.06);
+      --shadow-lg: 0 20px 48px rgba(15,23,42,0.12), 0 8px 16px rgba(15,23,42,0.06);
     }
+
+    html { scroll-behavior: smooth; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.6;
+      line-height: 1.5;
+      min-height: 100vh;
     }
 
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { color: var(--accent-dark); text-decoration: underline; }
-
-    /* ── Header ──────────────────────────────── */
-    header {
-      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
-      color: #fff;
-      padding: 4rem 2rem 3rem;
-      text-align: center;
-    }
-    header h1 {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 0.5rem;
-    }
-    header h1 span { opacity: 0.7; font-weight: 400; }
-    header p {
-      font-size: 1.15rem;
-      opacity: 0.85;
-      max-width: 560px;
-      margin: 0.5rem auto 1.5rem;
-    }
-    .badges { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
-    .badge {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 999px;
-      padding: 0.25rem 0.8rem;
-      font-size: 0.8rem;
-      font-family: monospace;
-    }
-
-    /* ── Nav ─────────────────────────────────── */
-    nav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 2rem;
-      display: flex;
-      gap: 0;
-      overflow-x: auto;
+    /* ── HEADER ──────────────────────────────────────────────── */
+    .header {
       position: sticky;
       top: 0;
       z-index: 100;
+      background: rgba(240, 244, 250, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
     }
-    nav a {
-      display: block;
-      padding: 0.8rem 1rem;
-      font-size: 0.88rem;
-      font-weight: 500;
-      color: var(--muted);
-      white-space: nowrap;
-      border-bottom: 2px solid transparent;
-    }
-    nav a:hover { color: var(--accent); text-decoration: none; border-bottom-color: var(--accent); }
 
-    /* ── Page layout ─────────────────────────── */
-    main { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
-
-    section { margin-bottom: 4rem; scroll-margin-top: 3.5rem; }
-    section h2 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 2px solid var(--border);
-    }
-    section > p { color: var(--muted); margin: 0.75rem 0 1.5rem; max-width: 680px; }
-
-    /* ── Install box ─────────────────────────── */
-    .install-box {
-      background: var(--code-bg);
-      border-radius: var(--radius);
-      padding: 1rem 1.5rem;
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      height: 56px;
       display: flex;
       align-items: center;
-      gap: 1rem;
-      max-width: 480px;
+      gap: 24px;
     }
-    .install-box code {
-      color: #7ee787;
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 1rem;
-      flex: 1;
-    }
-    .copy-btn {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 4px;
-      color: #ccc;
-      cursor: pointer;
-      font-size: 0.75rem;
-      padding: 0.3rem 0.6rem;
-    }
-    .copy-btn:hover { background: rgba(255,255,255,0.2); }
 
-    /* ── Example grid (code + cloud) ─────────── */
-    .example {
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      color: inherit;
+      flex-shrink: 0;
+    }
+
+    .logo-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+    }
+
+    .header-nav {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .header-nav::-webkit-scrollbar { display: none; }
+
+    .header-nav a {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .header-nav a:hover { background: rgba(79, 70, 229, 0.08); color: var(--accent); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      background: rgba(79, 70, 229, 0.1);
+      color: var(--accent);
+      border: 1px solid rgba(79, 70, 229, 0.2);
+    }
+
+    /* ── LAYOUT ──────────────────────────────────────────────── */
+    .page { max-width: 1400px; margin: 0 auto; padding: 0 24px 60px; }
+
+    .hero-section {
+      padding: 40px 0 32px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: var(--gap);
+      gap: 32px;
       align-items: start;
     }
-    @media (max-width: 760px) {
-      .example { grid-template-columns: 1fr; }
+
+    .hero-text { min-width: 0; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
     }
 
-    .cloud-box {
+    h1 {
+      font-size: clamp(36px, 4.5vw, 64px);
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 500px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* ── STATS ROW ───────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-sub { font-size: 12px; color: var(--muted); }
+
+    /* ── CLOUD CANVAS ────────────────────────────────────────── */
+    .cloud-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
       overflow: hidden;
-      min-height: 280px;
+      position: relative;
+    }
+
+    .cloud-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+      flex-wrap: wrap;
+    }
+
+    .cloud-toolbar-title { font-size: 13px; font-weight: 600; }
+    .cloud-toolbar-sub { font-size: 12px; color: var(--muted); }
+
+    .cloud-toolbar-right { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .cloud-canvas {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      position: relative;
+    }
+
+    .cloud-canvas svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cloud-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .cloud-empty.visible { opacity: 1; }
+    .cloud-empty-icon { font-size: 40px; }
+
+    /* ── CONTROLS PANEL ──────────────────────────────────────── */
+    .controls-section {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      margin-bottom: 24px;
+      align-items: start;
+    }
+
+    .main-demo-stack { order: 1; }
+    .manager-panel { order: 2; }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-body { padding: 16px; }
+
+    /* ── WORD INPUT ──────────────────────────────────────────── */
+    .word-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .word-input {
+      flex: 1;
+      min-width: 0;
+      padding: 9px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    .word-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+
+    .weight-input {
+      width: 72px;
+      flex-shrink: 0;
+      padding: 9px 10px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+      text-align: center;
+    }
+
+    .weight-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+
+    /* ── BUTTONS ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: all 0.15s;
+      text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover { background: #4338ca; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover { background: var(--surface-2); border-color: rgba(15,23,42,0.2); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border-color: transparent;
+      padding: 6px 10px;
+    }
+
+    .btn-ghost:hover { background: rgba(15,23,42,0.05); color: var(--text); }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--rose);
+      border-color: transparent;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .btn-danger:hover { background: rgba(225, 29, 72, 0.08); }
+
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 6px; }
+
+    .btn-icon {
+      padding: 7px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .btn-icon:hover { border-color: var(--accent); color: var(--accent); background: rgba(79, 70, 229, 0.06); }
+    .btn-icon.active { border-color: var(--accent); color: var(--accent); background: rgba(79, 70, 229, 0.1); }
+
+    .btn-icon-text {
+      padding: 7px 10px;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .btn-icon-text .icon {
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .btn-icon-text .label {
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    /* ── WORD LIST ───────────────────────────────────────────── */
+    .word-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 320px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .word-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      font-size: 13px;
+      animation: slideIn 0.25s ease;
+      transition: border-color 0.15s;
+    }
+
+    .word-item:hover { border-color: rgba(15,23,42,0.2); }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .word-item-text {
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .word-item-bar {
+      width: 60px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .word-item-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .word-item-weight {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      width: 28px;
+      text-align: right;
+    }
+
+    .word-item-color {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── SLIDERS ─────────────────────────────────────────────── */
+    .control-group {
+      margin-bottom: 16px;
+    }
+
+    .control-group:last-child { margin-bottom: 0; }
+
+    .control-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .control-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: none;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.4);
+      transition: transform 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    /* ── SEGMENTED CONTROL ───────────────────────────────────── */
+    .segmented {
+      display: flex;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .segmented button {
+      flex: 1;
+      padding: 6px 10px;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+
+    .segmented button.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ── COLOR PALETTE ───────────────────────────────────────── */
+    .palette-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .palette-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+      position: relative;
+    }
+
+    .palette-swatch:hover { transform: scale(1.15); }
+
+    .palette-swatch.active {
+      border-color: var(--text);
+      transform: scale(1.1);
+    }
+
+    .palette-swatch.active::after {
+      content: '✓';
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-    }
-    .cloud-box svg { display: block; width: 100%; }
-
-    pre {
-      border-radius: var(--radius);
-      overflow: auto;
-      font-size: 0.82rem;
-      line-height: 1.6;
-      max-height: 460px;
-    }
-    pre code.hljs { border-radius: var(--radius); }
-
-    /* ── API table ───────────────────────────── */
-    .api-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    .api-table th, .api-table td { padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
-    .api-table th { font-weight: 600; background: #f1f5f9; }
-    .api-table code { font-family: monospace; font-size: 0.82rem; background: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 3px; }
-
-    /* ── Animated demo controls ──────────────── */
-    .controls { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
-    .btn {
-      background: var(--accent);
+      font-size: 12px;
       color: #fff;
-      border: none;
-      border-radius: var(--radius);
-      padding: 0.45rem 1rem;
-      cursor: pointer;
-      font-size: 0.88rem;
-      font-weight: 500;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
     }
-    .btn:hover { background: var(--accent-dark); }
-    .btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-    .btn.secondary:hover { background: #f1f5f9; }
 
-    /* ── Two-cloud layout for spiral comparison ─ */
-    .two-up {
+    /* ── PRESET CHIPS ────────────────────────────────────────── */
+    .preset-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+      gap: 8px;
     }
-    .two-up h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
 
-    /* ── Status/loading indicator ────────────── */
-    .loading { color: var(--muted); font-size: 0.85rem; padding: 2rem; text-align: center; }
+    .preset-btn {
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface-2);
+      cursor: pointer;
+      font-family: inherit;
+      text-align: left;
+      transition: all 0.15s;
+    }
 
-    /* ── Footer ──────────────────────────────── */
+    .preset-btn:hover { border-color: var(--accent); background: rgba(79, 70, 229, 0.04); }
+    .preset-btn:hover .preset-name { color: var(--accent); }
+    .preset-btn.active {
+      border-color: rgba(79, 70, 229, 0.35);
+      background: rgba(79, 70, 229, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.08);
+    }
+
+    .preset-btn.active .preset-name { color: var(--accent); }
+
+    .preset-name { font-size: 12px; font-weight: 700; display: block; margin-bottom: 2px; }
+    .preset-count { font-size: 11px; color: var(--muted); }
+
+    /* ── STREAM SECTION ──────────────────────────────────────── */
+    .section { margin-bottom: 32px; }
+    .section-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .section-sub { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .cloud-controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+    }
+
+    .weight-demo-grid {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .api-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    /* ── STREAM ARRIVALS ─────────────────────────────────────── */
+    .arrivals-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .arrival-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(79, 70, 229, 0.06);
+      font-size: 13px;
+      animation: slideIn 0.2s ease;
+      border: 1px solid rgba(79, 70, 229, 0.12);
+    }
+
+    .arrival-item-text { font-weight: 600; }
+    .arrival-item-val { color: var(--muted); font-size: 12px; }
+
+    /* ── COMPARE SECTION ─────────────────────────────────────── */
+    .compare-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .compare-card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .compare-card-title { font-size: 14px; font-weight: 700; }
+    .compare-card-sub { font-size: 12px; color: var(--muted); }
+    .compare-card-stat { font-size: 12px; color: var(--muted); }
+
+    .compare-canvas {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+    }
+
+    .compare-canvas svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── CODE BLOCK ──────────────────────────────────────────── */
+    .code-block {
+      background: #0f172a;
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .code-block code {
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #e2e8f0;
+    }
+
+    .tok-keyword  { color: #c084fc; }
+    .tok-fn       { color: #67e8f9; }
+    .tok-str      { color: #86efac; }
+    .tok-comment  { color: #475569; font-style: italic; }
+    .tok-num      { color: #fbbf24; }
+    .tok-punct    { color: #94a3b8; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .code-block pre code {
+      display: block;
+      white-space: pre;
+    }
+
+    /* ── FEATURE GRID ────────────────────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .feature-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .feature-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .feature-desc  { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* ── FOOTER ──────────────────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
-      padding: 2rem;
+      padding: 24px 0 0;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    footer code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--surface);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── TOOLTIP ─────────────────────────────────────────────── */
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: var(--text);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .tooltip.visible { opacity: 1; }
+
+    /* ── TOAST ───────────────────────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--text);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow-lg);
+      animation: toastIn 0.25s ease, toastOut 0.25s ease 2.5s forwards;
+      max-width: 300px;
+    }
+
+    @keyframes toastIn  { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(12px); } }
+
+    /* ── LOADING SPINNER ─────────────────────────────────────── */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    .loading .spinner { display: block; }
+    .loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── DIVIDER ─────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    /* ── SCROLL INDICATOR ────────────────────────────────────── */
+    .scroll-hint {
       text-align: center;
       color: var(--muted);
-      font-size: 0.88rem;
+      font-size: 12px;
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
-    footer a { color: var(--muted); }
+
+    .scroll-hint::before, .scroll-hint::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      .hero-section { grid-template-columns: 1fr; }
+      .controls-section { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .feature-grid { grid-template-columns: repeat(2, 1fr); }
+      .main-demo-stack,
+      .manager-panel { order: initial; }
+      .cloud-controls-grid,
+      .weight-demo-grid,
+      .api-layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner {
+        height: auto;
+        min-height: 48px;
+        padding: 10px 0;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .header-nav {
+        width: 100%;
+        margin-left: 0;
+        padding-bottom: 2px;
+      }
+      .two-col { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .feature-grid { grid-template-columns: 1fr; }
+      .page { padding: 0 16px 48px; }
+      .header { padding: 0 16px; }
+      h1 { font-size: 36px; }
+      .cloud-controls-grid,
+      .weight-demo-grid,
+      .api-layout { grid-template-columns: 1fr; }
+      .btn-icon-text {
+        padding: 7px;
+      }
+      .btn-icon-text .label {
+        display: none;
+      }
+    }
+
+    /* ── CLOUD WORD STYLES ───────────────────────────────────── */
+    .cloud-word {
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .cloud-word:hover { opacity: 0.7; }
+
+    /* Dark cloud background variant */
+    .cloud-canvas.dark-bg {
+      background: #0f172a;
+    }
+
+    .cloud-canvas.light-bg {
+      background: #fafbff;
+    }
+
+    .cloud-canvas.gradient-bg {
+      background: linear-gradient(135deg, #f0f4ff 0%, #faf0ff 50%, #f0fff4 100%);
+    }
+
+    .active-pulse {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>d3-wordcloud <span>for D3 v7+</span></h1>
-  <p>A modern word cloud layout — with incremental placement, so clouds can be built and animated one word at a time.</p>
-  <div class="badges">
-    <span class="badge">ESM + UMD</span>
-    <span class="badge">D3 v7</span>
-    <span class="badge">MIT</span>
-    <span class="badge">0 peer deps beyond d3-dispatch</span>
+<div class="tooltip" id="tooltip"></div>
+<div class="toast-container" id="toast-container"></div>
+
+<header class="header">
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <span class="logo-badge">d3</span>
+      <span>d3-wordcloud</span>
+    </a>
+    <span class="badge">v1.0.0</span>
+    <nav class="header-nav">
+      <a href="#live-demo">Live Demo</a>
+      <a href="#stream-lab">Stream Lab</a>
+      <a href="#spiral-lab">Spiral Lab</a>
+      <a href="#api-section">API</a>
+      <a href="https://github.com/sanand0/d3-wordcloud" target="_blank">GitHub ↗</a>
+    </nav>
   </div>
 </header>
 
-<nav>
-  <a href="#install">Install</a>
-  <a href="#demo-basic">Basic</a>
-  <a href="#demo-incremental">Incremental</a>
-  <a href="#demo-dense">Dense</a>
-  <a href="#demo-spirals">Spirals</a>
-  <a href="#demo-rotation">Rotation</a>
-  <a href="#demo-color">Color &amp; Font</a>
-  <a href="#api">API</a>
-</nav>
+<main class="page">
 
-<main>
-
-<!-- ── Install ───────────────────────────────────────────────── -->
-<section id="install">
-  <h2>Install</h2>
-  <p>Via npm (once published) — or import the source directly in the browser using an <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap">import map</a>.</p>
-  <div class="install-box">
-    <code>npm install d3-wordcloud</code>
-    <button class="copy-btn" onclick="navigator.clipboard.writeText('npm install d3-wordcloud')">copy</button>
-  </div>
-  <br>
-  <pre><code id="install-esm" class="language-javascript"></code></pre>
-</section>
-
-<!-- ── Basic ─────────────────────────────────────────────────── -->
-<section id="demo-basic">
-  <h2>Basic word cloud</h2>
-  <p>Supply a <code>words</code> array where each object has a <code>text</code> string and a numeric <code>value</code>. The default font size accessor is <code>d =&gt; Math.sqrt(d.value)</code>.</p>
-  <div class="example">
+  <!-- HERO -->
+  <section class="hero-section">
+    <div class="hero-text">
+      <div class="eyebrow">
+        <span class="badge">Interactive Demo</span>
+      </div>
+      <h1>Word clouds that feel <span>native to D3</span></h1>
+      <p class="hero-desc">
+        Type words below, tune the layout in real time, and watch the cloud
+        animate its placement. Built on a persistent bitmap board with incremental
+        streaming, promise-friendly async, and full D3 selection rendering.
+      </p>
+      <div class="hero-pills">
+        <span class="pill"><span class="pill-dot" style="color:#4f46e5"></span>ESM-first</span>
+        <span class="pill"><span class="pill-dot" style="color:#0d9488"></span>Incremental streaming</span>
+        <span class="pill"><span class="pill-dot" style="color:#d97706"></span>Async / await</span>
+        <span class="pill"><span class="pill-dot" style="color:#e11d48"></span>Bitmap collision</span>
+        <span class="pill"><span class="pill-dot" style="color:#7c3aed"></span>D3 selection rendering</span>
+      </div>
+    </div>
     <div>
-      <div class="cloud-box" id="cloud-basic"><span class="loading">Rendering…</span></div>
-    </div>
-    <pre><code id="code-basic" class="language-javascript"></code></pre>
-  </div>
-</section>
-
-<!-- ── Incremental ────────────────────────────────────────────── -->
-<section id="demo-incremental">
-  <h2>Incremental placement</h2>
-  <p>Call <code>cloud.add(words)</code> to place new words into the existing layout without disturbing already-placed ones. Pair with the <code>"word"</code> event to animate each arrival.</p>
-  <div class="controls">
-    <button class="btn" id="btn-add">Add 5 words</button>
-    <button class="btn secondary" id="btn-reset">Reset</button>
-    <span id="word-count" style="align-self:center;font-size:.85rem;color:var(--muted)"></span>
-  </div>
-  <div class="example">
-    <div>
-      <div class="cloud-box" id="cloud-incremental"><span class="loading">Click "Add 5 words" to begin</span></div>
-    </div>
-    <pre><code id="code-incremental" class="language-javascript"></code></pre>
-  </div>
-</section>
-
-<!-- ── Dense packing ─────────────────────────────────────────── -->
-<section id="demo-dense">
-  <h2>Dense packing — ~100 words</h2>
-  <p>A strongly skewed size distribution — a few large dominant terms and many small ones — produces the classic word-cloud look. Padding 1 and a compact sans-serif let ~100 items pack tightly.</p>
-  <div class="example" style="grid-template-columns:1fr;">
-    <div class="cloud-box" id="cloud-dense" style="min-height:380px"><span class="loading">Rendering…</span></div>
-    <pre><code id="code-dense" class="language-javascript"></code></pre>
-  </div>
-</section>
-
-<!-- ── Spirals ────────────────────────────────────────────────── -->
-<section id="demo-spirals">
-  <h2>Spiral patterns</h2>
-  <p>Two built-in spiral strategies control how the layout searches outward from the centre. Words are uniform in size and coloured by placement order (purple → first, yellow → last), so the search path emerges as a colour gradient. A faint dashed line traces the raw mathematical spiral.</p>
-  <div class="example" style="grid-template-columns: 1fr;">
-    <div class="two-up">
-      <div>
-        <h3>Archimedean (default)</h3>
-        <div class="cloud-box" id="cloud-archimedean"><span class="loading">Rendering…</span></div>
-      </div>
-      <div>
-        <h3>Rectangular</h3>
-        <div class="cloud-box" id="cloud-rectangular"><span class="loading">Rendering…</span></div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Words Placed</div>
+          <div class="stat-value" id="stat-placed">0</div>
+          <div class="stat-sub">in the cloud</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Footprint</div>
+          <div class="stat-value" id="stat-footprint">—</div>
+          <div class="stat-sub">layout bounds</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Largest Word</div>
+          <div class="stat-value" id="stat-largest">0<span style="font-size:14px;font-weight:600">px</span></div>
+          <div class="stat-sub">font size</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Coverage</div>
+          <div class="stat-value" id="stat-coverage">0<span style="font-size:14px;font-weight:600">%</span></div>
+          <div class="stat-sub">of canvas area</div>
+        </div>
       </div>
     </div>
-    <pre><code id="code-spirals" class="language-javascript"></code></pre>
-  </div>
-</section>
+  </section>
 
-<!-- ── Rotation ───────────────────────────────────────────────── -->
-<section id="demo-rotation">
-  <h2>Rotation</h2>
-  <p>The <code>rotate</code> accessor controls word angles. Here are three common configurations rendered side by side.</p>
-  <div class="example" style="grid-template-columns: 1fr;">
-    <div class="two-up" style="grid-template-columns: 1fr 1fr 1fr;">
-      <div>
-        <h3>Horizontal only</h3>
-        <div class="cloud-box" id="cloud-rot-0"><span class="loading">…</span></div>
+  <!-- MAIN DEMO -->
+  <section class="section" id="live-demo">
+    <div class="controls-section">
+
+      <!-- LEFT: Word Manager -->
+      <div class="panel manager-panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Word Manager
+          </span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-xs btn-secondary" id="btn-clear-all">Clear all</button>
+            <button class="btn btn-xs btn-secondary" id="btn-sort">Sort</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <!-- Add word input -->
+          <div class="word-input-row">
+            <input class="word-input" type="text" id="word-input" placeholder="Type a word…" autocomplete="off" spellcheck="false">
+            <input class="weight-input" type="number" id="weight-input" value="50" min="1" max="200" title="Weight (1–200)">
+            <button class="btn btn-primary" id="btn-add-word">
+              <span class="btn-text">Add</span>
+              <span class="spinner"></span>
+            </button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Weight controls font size (1–200). Press Enter to add.</div>
+
+          <!-- Presets -->
+          <div class="control-label" style="margin-bottom:8px">Quick presets</div>
+          <div class="preset-grid" id="preset-grid" style="margin-bottom:14px"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:10px" id="preset-status">
+            Active preset drives the Stream Lab and Spiral Comparison.
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Word list -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">
+              Words (<span id="word-count">0</span>)
+            </span>
+            <button class="btn btn-ghost btn-xs" id="btn-export">Export JSON</button>
+          </div>
+          <div class="word-list" id="word-list">
+            <div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">
+              Add words above to get started
+            </div>
+          </div>
+        </div>
       </div>
-      <div>
-        <h3>0° and 90°</h3>
-        <div class="cloud-box" id="cloud-rot-90"><span class="loading">…</span></div>
-      </div>
-      <div>
-        <h3>Random (±60°)</h3>
-        <div class="cloud-box" id="cloud-rot-rand"><span class="loading">…</span></div>
+
+      <!-- RIGHT: Cloud + Controls -->
+      <div class="main-demo-stack" style="display:flex;flex-direction:column;gap:16px">
+        <div class="cloud-wrap">
+          <div class="cloud-toolbar">
+            <div>
+              <div class="cloud-toolbar-title" id="cloud-title">Live word cloud</div>
+              <div class="cloud-toolbar-sub" id="cloud-sub">Add words on the left to see the cloud</div>
+            </div>
+            <div class="cloud-toolbar-right">
+              <button class="btn-icon btn-icon-text" id="btn-bg-toggle" title="Toggle background">
+                <span class="icon">☀</span><span class="label" id="btn-bg-label">Light</span>
+              </button>
+              <button class="btn-icon btn-icon-text" id="btn-animate-toggle" title="Toggle animation" aria-pressed="true">
+                <span class="icon">◎</span><span class="label" id="btn-anim-label">Motion</span>
+              </button>
+              <button class="btn-icon btn-icon-text" id="btn-shuffle" title="Shuffle layout">
+                <span class="icon">⟳</span><span class="label">Shuffle</span>
+              </button>
+              <button class="btn-icon btn-icon-text" id="btn-download" title="Download SVG">
+                <span class="icon">↓</span><span class="label">SVG</span>
+              </button>
+            </div>
+          </div>
+          <div class="cloud-canvas light-bg" id="main-cloud">
+            <div class="cloud-empty" id="cloud-empty">
+              <span class="cloud-empty-icon">☁</span>
+              <span>Add words to see the cloud</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls row -->
+        <div class="cloud-controls-grid">
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Layout</span>
+            </div>
+            <div class="panel-body">
+              <div class="control-group">
+                <div class="control-label">
+                  Spiral
+                </div>
+                <div class="segmented" id="spiral-control">
+                  <button data-val="archimedean" class="active">Archimedean</button>
+                  <button data-val="rectangular">Rectangular</button>
+                </div>
+              </div>
+              <div class="control-group">
+                <div class="control-label">
+                  Rotation <span class="control-value" id="val-rotation">Mixed</span>
+                </div>
+                <div class="segmented" id="rotation-control">
+                  <button data-val="0" >None</button>
+                  <button data-val="mixed" class="active">Mixed</button>
+                  <button data-val="90">90°</button>
+                </div>
+              </div>
+              <div class="control-group">
+                <div class="control-label">
+                  Padding <span class="control-value" id="val-padding">3</span>
+                </div>
+                <input type="range" id="range-padding" min="0" max="12" value="3">
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Typography</span>
+            </div>
+            <div class="panel-body">
+              <div class="control-group">
+                <div class="control-label">
+                  Min size <span class="control-value" id="val-min-size">14px</span>
+                </div>
+                <input type="range" id="range-min-size" min="8" max="40" value="14">
+              </div>
+              <div class="control-group">
+                <div class="control-label">
+                  Max size <span class="control-value" id="val-max-size">80px</span>
+                </div>
+                <input type="range" id="range-max-size" min="30" max="140" value="80">
+              </div>
+              <div class="control-group">
+                <div class="control-label">Font</div>
+                <div class="segmented" id="font-control">
+                  <button data-val="Inter, sans-serif" class="active">Inter</button>
+                  <button data-val="Georgia, serif">Serif</button>
+                  <button data-val="JetBrains Mono, monospace">Mono</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Color Palette</span>
+            </div>
+            <div class="panel-body">
+              <div class="control-group">
+                <div class="control-label" style="margin-bottom:10px">Scheme</div>
+                <div class="segmented" id="palette-control" style="margin-bottom:12px">
+                  <button data-val="vivid" class="active">Vivid</button>
+                  <button data-val="cool">Cool</button>
+                  <button data-val="warm">Warm</button>
+                  <button data-val="mono">Mono</button>
+                </div>
+              </div>
+              <div class="control-group">
+                <div class="control-label">Custom colors</div>
+                <div class="palette-row" id="custom-palette"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
-    <pre><code id="code-rotation" class="language-javascript"></code></pre>
-  </div>
-</section>
+  </section>
 
-<!-- ── Color & Font ───────────────────────────────────────────── -->
-<section id="demo-color">
-  <h2>Color &amp; font</h2>
-  <p>The layout computes positions only — color, font family, and any other visual properties are applied in your render function, using D3 scales or any other approach.</p>
-  <div class="example">
-    <div>
-      <div class="cloud-box" id="cloud-color"><span class="loading">Rendering…</span></div>
+  <!-- STREAM LAB -->
+  <section class="section" id="stream-lab">
+    <div style="display:flex;align-items:end;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap">
+      <div>
+        <div class="eyebrow"><span class="badge">Feature</span></div>
+        <div class="section-title">Incremental Streaming Lab</div>
+        <div class="section-sub">
+          Words arrive one burst at a time. Existing words never move — new placements integrate into the live board.
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" id="stream-burst-btn">Inject Burst (6)</button>
+        <button class="btn btn-secondary" id="stream-auto-btn">▶ Auto stream</button>
+        <button class="btn btn-ghost" id="stream-reset-btn">Reset</button>
+      </div>
     </div>
-    <pre><code id="code-color" class="language-javascript"></code></pre>
-  </div>
-</section>
 
-<!-- ── API reference ──────────────────────────────────────────── -->
-<section id="api">
-  <h2>API reference</h2>
+    <div class="two-col">
+      <div>
+        <div class="cloud-wrap">
+          <div class="cloud-toolbar">
+            <div>
+              <div class="cloud-toolbar-title">Stream board</div>
+              <div class="cloud-toolbar-sub" id="stream-sub">Idle — inject a burst or start auto stream</div>
+            </div>
+            <div class="cloud-toolbar-right" style="font-size:12px;color:var(--muted)">
+              <span id="stream-count-label">0 words</span>
+            </div>
+          </div>
+          <div class="cloud-canvas dark-bg" id="stream-cloud"></div>
+        </div>
 
-  <p>All configuration methods are chainable and follow the getter/setter pattern: called with no argument they return the current value; called with an argument they set it and return <code>cloud</code>. Accessors accept either a constant value or a function <code>(datum, index) → value</code>.</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px">
+          <div class="stat-card">
+            <div class="stat-label">Total placed</div>
+            <div class="stat-value" id="stream-stat-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Last burst</div>
+            <div class="stat-value" id="stream-stat-burst">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Board bounds</div>
+            <div class="stat-value" style="font-size:16px" id="stream-stat-bounds">—</div>
+          </div>
+        </div>
+      </div>
 
-  <table class="api-table">
-    <thead><tr><th>Method</th><th>Default</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><code>cloud.start()</code></td><td></td><td>Clear the board and place all <code>.words()</code> from scratch. Returns <code>cloud</code>.</td></tr>
-      <tr><td><code>cloud.stop()</code></td><td></td><td>Cancel any running async layout and free sprite memory.</td></tr>
-      <tr><td><code>cloud.add(words)</code></td><td></td><td>Place <code>words</code> into the existing layout without re-placing already-placed words. Initialises automatically if <code>start()</code> has not been called.</td></tr>
-      <tr><td><code>cloud.clear()</code></td><td></td><td>Reset persistent state (board, bounds, placed list). The next <code>start()</code> begins from an empty board.</td></tr>
-      <tr><td><code>cloud.placed()</code></td><td></td><td>Return a snapshot array of all successfully placed word datums (cumulative across <code>start()</code> and <code>add()</code> calls).</td></tr>
-      <tr><td><code>cloud.words(array)</code></td><td><code>[]</code></td><td>Input word data.</td></tr>
-      <tr><td><code>cloud.size([w, h])</code></td><td><code>[256, 256]</code></td><td>Layout area in pixels. Word <code>x</code>/<code>y</code> coordinates are relative to the centre.</td></tr>
-      <tr><td><code>cloud.text(fn)</code></td><td><code>d =&gt; d.text</code></td><td>Text string accessor.</td></tr>
-      <tr><td><code>cloud.fontSize(fn)</code></td><td><code>d =&gt; Math.sqrt(d.value)</code></td><td>Font size in pixels.</td></tr>
-      <tr><td><code>cloud.font(fn)</code></td><td><code>"serif"</code></td><td>Font family.</td></tr>
-      <tr><td><code>cloud.fontStyle(fn)</code></td><td><code>"normal"</code></td><td>CSS font-style.</td></tr>
-      <tr><td><code>cloud.fontWeight(fn)</code></td><td><code>"normal"</code></td><td>CSS font-weight.</td></tr>
-      <tr><td><code>cloud.rotate(fn)</code></td><td>random ±30°/60°</td><td>Rotation in degrees.</td></tr>
-      <tr><td><code>cloud.padding(fn)</code></td><td><code>1</code></td><td>Extra spacing around each word (pixels).</td></tr>
-      <tr><td><code>cloud.spiral(name | fn)</code></td><td><code>"archimedean"</code></td><td><code>"archimedean"</code> or <code>"rectangular"</code>. Pass a custom <code>(size) =&gt; t =&gt; [dx, dy]</code> factory for full control.</td></tr>
-      <tr><td><code>cloud.random(fn)</code></td><td><code>Math.random</code></td><td>RNG. Pass a seeded function for reproducible layouts.</td></tr>
-      <tr><td><code>cloud.timeInterval(ms)</code></td><td><code>Infinity</code></td><td>Max milliseconds per event-loop tick. Lower values keep the UI responsive during large layouts.</td></tr>
-      <tr><td><code>cloud.canvas(fn)</code></td><td><code>() =&gt; document.createElement("canvas")</code></td><td>Canvas factory. Override for server-side rendering (e.g. node-canvas).</td></tr>
-      <tr><td><code>cloud.on("word", fn)</code></td><td></td><td>Called once per successfully placed word. Argument: the word datum.</td></tr>
-      <tr><td><code>cloud.on("end", fn)</code></td><td></td><td>Called when the current batch finishes. Arguments: <code>(batchPlaced, bounds)</code>.</td></tr>
-    </tbody>
-  </table>
-</section>
+      <div class="panel" style="align-self:start">
+        <div class="panel-header">
+          <span class="panel-title">Recent arrivals</span>
+          <span style="font-size:11px;color:var(--muted)" id="stream-speed-label">≈0 words/s</span>
+        </div>
+        <div class="panel-body">
+          <div class="arrivals-list" id="arrivals-list">
+            <div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">
+              No arrivals yet
+            </div>
+          </div>
+        </div>
+        <div class="panel-header" style="border-top:1px solid var(--border);border-bottom:none;margin-top:0">
+          <span class="panel-title">How it works</span>
+        </div>
+        <div class="panel-body" style="font-size:13px;color:var(--muted);line-height:1.7">
+          <p>Each <code style="font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px">addAsync(batch)</code> call places a new batch into the <strong>same persistent bitmap board</strong>.</p>
+          <br>
+          <p>Existing words are never disturbed — the algorithm only searches free space beyond the current boundary for incoming words.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPIRAL COMPARE -->
+  <section class="section" id="spiral-lab">
+    <div style="display:flex;align-items:end;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap">
+      <div>
+        <div class="eyebrow"><span class="badge">Feature</span></div>
+        <div class="section-title">Spiral Comparison</div>
+        <div class="section-sub">
+          Same data, same seed — only the search geometry differs. Archimedean is smoother; Rectangular has sharper steps.
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="compare-shuffle-btn">Shuffle comparison</button>
+    </div>
+
+    <div class="two-col">
+      <div class="compare-card">
+        <div class="compare-card-header">
+          <div>
+            <div class="compare-card-title">Archimedean Spiral</div>
+            <div class="compare-card-sub">Smooth radial search · balanced packing</div>
+          </div>
+          <span class="compare-card-stat" id="arch-stat">0 words</span>
+        </div>
+        <div class="compare-canvas" id="arch-cloud"></div>
+      </div>
+
+      <div class="compare-card">
+        <div class="compare-card-header">
+          <div>
+            <div class="compare-card-title">Rectangular Spiral</div>
+            <div class="compare-card-sub">Axial steps · tighter rectangular packing</div>
+          </div>
+          <span class="compare-card-stat" id="rect-stat">0 words</span>
+        </div>
+        <div class="compare-canvas" id="rect-cloud"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORD WEIGHT DEMO -->
+  <section class="section" id="weight-demo">
+    <div style="display:flex;align-items:end;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap">
+      <div>
+        <div class="eyebrow"><span class="badge">Feature</span></div>
+        <div class="section-title">Minimal update — add duplicate or remove</div>
+        <div class="section-sub">
+          Adding a word that already exists boosts its weight and triggers a fresh placement pass.
+          The transitions keep that update readable, but the cloud may re-pack around the changed word.
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="weight-reset-btn">Reset demo</button>
+    </div>
+
+    <div class="weight-demo-grid">
+      <!-- Controls -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Try it</span>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:12px">
+          <p style="font-size:13px;color:var(--muted);line-height:1.6">
+            Click a word chip to <strong>add it again</strong> (+20 weight). Click any word in the cloud to <strong>remove it</strong>.
+          </p>
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Add duplicates</div>
+          <div id="weight-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          <div class="divider"></div>
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Event log</div>
+          <div id="weight-log" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;scrollbar-width:thin"></div>
+        </div>
+      </div>
+
+      <!-- Cloud -->
+      <div class="cloud-wrap">
+        <div class="cloud-toolbar">
+          <div>
+            <div class="cloud-toolbar-title">Weight demo cloud</div>
+            <div class="cloud-toolbar-sub" id="weight-demo-sub">Click chips to boost weight · click words in cloud to remove</div>
+          </div>
+          <div class="cloud-toolbar-right">
+            <span id="weight-demo-count" style="font-size:12px;color:var(--muted)">0 words</span>
+          </div>
+        </div>
+        <div class="cloud-canvas light-bg" id="weight-cloud" style="aspect-ratio:16/7"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section">
+    <div class="scroll-hint" style="margin-bottom:24px">API & Features</div>
+    <div class="api-layout" id="api-section">
+      <div>
+        <div class="section-title" style="margin-bottom:8px">Three lines to a cloud.</div>
+        <div class="section-sub" style="margin-bottom:20px">
+          The library surface is intentionally small. Everything you need, nothing you don't.
+        </div>
+        <div class="code-block"><pre><code><span class="tok-keyword">import</span> { cloud, renderWords } <span class="tok-keyword">from</span> <span class="tok-str">"d3-wordcloud"</span>;
+<span class="tok-keyword">import</span> * <span class="tok-keyword">as</span> d3 <span class="tok-keyword">from</span> <span class="tok-str">"d3"</span>;
+
+<span class="tok-comment">// Build the layout</span>
+<span class="tok-keyword">const</span> layout = <span class="tok-fn">cloud</span>()
+  .<span class="tok-fn">size</span>([<span class="tok-num">960</span>, <span class="tok-num">560</span>])
+  .<span class="tok-fn">words</span>(words)
+  .<span class="tok-fn">fontSize</span>((d) =&gt; scale(d.value))
+  .<span class="tok-fn">padding</span>(<span class="tok-num">3</span>)
+  .<span class="tok-fn">spiral</span>(<span class="tok-str">"archimedean"</span>);
+
+<span class="tok-comment">// Await the result</span>
+<span class="tok-keyword">const</span> { words, bounds } = <span class="tok-keyword">await</span> layout.<span class="tok-fn">startAsync</span>();
+
+<span class="tok-comment">// Render with D3</span>
+<span class="tok-fn">renderWords</span>(svg, words, {
+  width, height,
+  fill: (d) =&gt; color(d.group),
+  title: (d) =&gt; <span class="tok-str">`${d.text}: ${d.value}`</span>,
+});
+
+<span class="tok-comment">// Incremental streaming — board persists!</span>
+<span class="tok-keyword">await</span> layout.<span class="tok-fn">addAsync</span>(newBatch);</code></pre></div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="feature-icon">⚡</span>
+          <div class="feature-title">Bitmap collision</div>
+          <div class="feature-desc">Pixel-perfect placement using Jonathan Feinberg's bitmask algorithm. No overlapping words, ever.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📡</span>
+          <div class="feature-title">Incremental add</div>
+          <div class="feature-desc"><code style="font-size:11px">addAsync()</code> extends the live board. Existing words never shift or re-render.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔄</span>
+          <div class="feature-title">Promise API</div>
+          <div class="feature-desc"><code style="font-size:11px">startAsync()</code> and <code style="font-size:11px">addAsync()</code> return promises — works naturally with async/await.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🎨</span>
+          <div class="feature-title">renderWords()</div>
+          <div class="feature-desc">Drop-in D3 data join helper. Bring your own colors, fonts, classes, and transitions.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🌀</span>
+          <div class="feature-title">Dual spirals</div>
+          <div class="feature-desc">Archimedean for radial smoothness, Rectangular for tighter axis-aligned fills.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📦</span>
+          <div class="feature-title">ESM-first</div>
+          <div class="feature-desc">Tree-shakeable ES module with a UMD fallback. Zero runtime dependencies beyond d3-dispatch.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>d3-wordcloud — MIT license — Placement algorithm by Jonathan Feinberg</span>
+    <span>
+      <code>npm install d3-wordcloud</code>
+    </span>
+  </footer>
 
 </main>
 
-<footer>
-  <p>
-    d3-wordcloud is a modernization of
-    <a href="https://github.com/jasondavies/d3-cloud">Jason Davies' d3-cloud</a>
-    (algorithm by Jonathan Feinberg) ·
-    <a href="https://github.com/sanand0/d3-wordcloud">GitHub</a> ·
-    MIT License
-  </p>
-</footer>
-
-<!-- highlight.js (regular script — runs synchronously, available to module script below) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
 <script type="module">
-import { cloud, spirals } from "./src/index.js";
+import { cloud, renderWords, spirals } from "./src/index.js";
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────
+const MAIN_W   = 1200;
+const MAIN_H   = 560;
+const STREAM_W = 960;
+const STREAM_H = 480;
+const CMP_W    = 640;
+const CMP_H    = 400;
 
-const W = 500, H = 300;   // standard cloud dimensions
-const WD = 720, HD = 420; // dense demo dimensions
+// ── Palettes ───────────────────────────────────────────────────────────────
+const PALETTES = {
+  vivid:  ["#4f46e5", "#7c3aed", "#0d9488", "#d97706", "#e11d48", "#0284c7", "#16a34a", "#ea580c"],
+  cool:   ["#0ea5e9", "#0d9488", "#6366f1", "#8b5cf6", "#06b6d4", "#3b82f6", "#64748b", "#0f172a"],
+  warm:   ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#d97706", "#dc2626", "#b45309"],
+  mono:   ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0"],
+};
 
-function svgCloud(containerId, w = W, h = H) {
-  const el = document.getElementById(containerId);
-  el.innerHTML = "";
-  return d3.select(el).append("svg")
-    .attr("viewBox", `0 0 ${w} ${h}`)
-    .attr("width", "100%");
-}
+// ── Presets ────────────────────────────────────────────────────────────────
+const PRESETS = [
+  {
+    name: "AI Research",
+    words: [
+      ["transformer",148],["reasoning",142],["attention",134],["embedding",128],
+      ["fine-tuning",122],["context window",116],["tokenization",112],["inference",108],
+      ["alignment",104],["RLHF",100],["hallucination",96],["benchmark",92],
+      ["multimodal",88],["quantization",84],["grounding",80],["retrieval",76],
+      ["agent loop",72],["prompting",68],["distillation",64],["vector store",60],
+    ]
+  },
+  {
+    name: "Web Dev",
+    words: [
+      ["TypeScript",140],["React",136],["Vite",128],["tailwind",124],
+      ["accessibility",120],["SSR",116],["hydration",112],["bundler",108],
+      ["web components",104],["service worker",100],["edge functions",96],["monorepo",92],
+      ["design tokens",88],["state machine",84],["signals",80],["forms",76],
+      ["validation",72],["animations",68],["testing",64],["deployment",60],
+    ]
+  },
+  {
+    name: "Climate",
+    words: [
+      ["decarbonization",148],["renewables",140],["net zero",132],["carbon capture",128],
+      ["solar",122],["wind",118],["biodiversity",114],["methane",110],
+      ["resilience",106],["grid storage",102],["electrification",98],["adaptation",94],
+      ["reforestation",90],["ocean health",86],["carbon market",82],["policy",78],
+      ["agriculture",74],["heat pump",70],["circular economy",66],["clean hydrogen",62],
+    ]
+  },
+  {
+    name: "Finance",
+    words: [
+      ["liquidity",144],["yield curve",136],["derivatives",130],["volatility",126],
+      ["leverage",122],["alpha",118],["beta",114],["hedging",110],
+      ["portfolio",106],["rebalancing",102],["drawdown",98],["momentum",94],
+      ["mean reversion",90],["risk parity",86],["carry trade",82],["duration",78],
+      ["collateral",74],["stress test",70],["Basel III",66],["LIBOR",62],
+    ]
+  },
+];
 
-// Place words from the "end" event into an SVG with a fade-in.
-function drawWords(svg, placed, colorFn, w = W, h = H) {
-  svg.selectAll("text")
-    .data(placed, (d) => d.text)
-    .join(
-      (enter) => enter.append("text")
-        .attr("text-anchor", "middle")
-        .attr("transform", (d) => `translate(${d.x + w / 2},${d.y + h / 2}) rotate(${d.rotate})`)
-        .style("font-size",   (d) => `${d.size}px`)
-        .style("font-family", (d) => d.font)
-        .style("font-weight", (d) => d.weight)
-        .style("fill", colorFn)
-        .style("opacity", 0)
-        .text((d) => d.text)
-        .call((t) => t.transition().duration(400).style("opacity", 1))
-    );
-}
+// ── App state ──────────────────────────────────────────────────────────────
+const state = {
+  words: [],           // {text, value, color?}
+  activePreset: 0,
+  spiral: "archimedean",
+  rotation: "mixed",
+  padding: 3,
+  minSize: 14,
+  maxSize: 80,
+  font: "Inter, sans-serif",
+  palette: "vivid",
+  animation: true,
+  bgStyle: "light",   // light | dark | gradient
+  shuffleSeed: 1,
+};
 
-function seeded(s = 42) {
+let mainVersion = 0;
+let streamLayout = null;
+let streamCursor = 0;
+let streamAllWords = [];
+let streamTimer = null;
+let streamWordCount = 0;
+let streamStartTime = null;
+let compareSeed = 42;
+let tooltipTimeout = null;
+let sortAscending = true;
+let mainRenderTimer = null;
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const $wordInput   = document.getElementById("word-input");
+const $weightInput = document.getElementById("weight-input");
+const $addBtn      = document.getElementById("btn-add-word");
+const $wordList    = document.getElementById("word-list");
+const $wordCount   = document.getElementById("word-count");
+const $tooltip     = document.getElementById("tooltip");
+const $cloudEmpty  = document.getElementById("cloud-empty");
+
+// ── Seeded random ──────────────────────────────────────────────────────────
+function seededRng(seed = 1) {
+  let s = seed >>> 0;
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
 }
 
-const palette = d3.scaleOrdinal(d3.schemeTableau10);
-const coolPal = d3.scaleOrdinal(d3.schemePastel1);
-
-// ─── Datasets ─────────────────────────────────────────────────────────────────
-
-const techWords = [
-  { text: "visualization", value: 2400 }, { text: "D3",          value: 2000 },
-  { text: "JavaScript",    value: 1800 }, { text: "SVG",          value: 1500 },
-  { text: "layout",        value: 1200 }, { text: "canvas",       value: 1000 },
-  { text: "word cloud",    value:  900 }, { text: "data",         value:  800 },
-  { text: "animation",     value:  700 }, { text: "incremental",  value:  650 },
-  { text: "spiral",        value:  600 }, { text: "collision",    value:  550 },
-  { text: "bitmap",        value:  500 }, { text: "font",         value:  450 },
-  { text: "rotate",        value:  400 }, { text: "placement",    value:  380 },
-  { text: "dispatch",      value:  350 }, { text: "ESM",          value:  320 },
-];
-
-const incrPool = [
-  { text: "JavaScript", value: 1600 }, { text: "Python",     value: 1500 },
-  { text: "TypeScript", value: 1300 }, { text: "Rust",       value: 1200 },
-  { text: "Go",         value: 1100 }, { text: "Java",       value: 1050 },
-  { text: "C++",        value:  900 }, { text: "Ruby",       value:  800 },
-  { text: "Swift",      value:  750 }, { text: "Kotlin",     value:  700 },
-  { text: "Scala",      value:  650 }, { text: "Haskell",    value:  600 },
-  { text: "Clojure",    value:  550 }, { text: "Elixir",     value:  500 },
-  { text: "Julia",      value:  480 }, { text: "R",          value:  460 },
-  { text: "Perl",       value:  440 }, { text: "PHP",        value:  420 },
-  { text: "C",          value:  400 }, { text: "Erlang",     value:  380 },
-  { text: "Zig",        value:  360 }, { text: "Nim",        value:  340 },
-  { text: "OCaml",      value:  320 }, { text: "F#",         value:  300 },
-  { text: "Dart",       value:  290 }, { text: "Lua",        value:  280 },
-  { text: "Groovy",     value:  260 }, { text: "COBOL",      value:  250 },
-  { text: "Fortran",    value:  240 }, { text: "BASIC",      value:  230 },
-];
-
-// ~100 AI/ML terms spanning a 200× range of values — creates bold dominants
-// surrounded by many small supporting terms.
-const denseWords = [
-  { text: "intelligence",        value: 9800 }, { text: "learning",       value: 8900 },
-  { text: "neural",              value: 8100 }, { text: "data",           value: 7600 },
-  { text: "model",               value: 7100 },
-  { text: "training",            value: 5500 }, { text: "inference",      value: 5000 },
-  { text: "attention",           value: 4600 }, { text: "transformer",    value: 4200 },
-  { text: "gradient",            value: 3800 }, { text: "embedding",      value: 3500 },
-  { text: "language",            value: 3200 }, { text: "generation",     value: 2900 },
-  { text: "parameter",           value: 2700 }, { text: "weights",        value: 2500 },
-  { text: "backpropagation",     value: 2300 }, { text: "fine-tuning",    value: 2100 },
-  { text: "context window",      value: 1900 }, { text: "hallucination",  value: 1700 },
-  { text: "alignment",           value: 1600 }, { text: "reinforcement",  value: 1500 },
-  { text: "tokenization",        value: 1400 }, { text: "encoder",        value: 1300 },
-  { text: "decoder",             value: 1200 }, { text: "self-attention", value: 1100 },
-  { text: "prompt",              value: 1000 }, { text: "latent space",   value:  900 },
-  { text: "diffusion",           value:  850 }, { text: "multimodal",     value:  800 },
-  { text: "benchmark",           value:  750 }, { text: "perplexity",     value:  700 },
-  { text: "overfitting",         value:  650 }, { text: "epoch",          value:  600 },
-  { text: "dropout",             value:  580 }, { text: "activation",     value:  550 },
-  { text: "RLHF",                value:  490 }, { text: "BERT",           value:  470 },
-  { text: "GPT",                 value:  450 }, { text: "ResNet",         value:  430 },
-  { text: "batch norm",          value:  410 }, { text: "softmax",        value:  390 },
-  { text: "ReLU",                value:  370 }, { text: "LSTM",           value:  360 },
-  { text: "CNN",                 value:  350 }, { text: "GAN",            value:  340 },
-  { text: "VAE",                 value:  330 }, { text: "LoRA",           value:  320 },
-  { text: "CLIP",                value:  310 }, { text: "RAG",            value:  300 },
-  { text: "logits",              value:  290 }, { text: "recall",         value:  280 },
-  { text: "precision",           value:  270 }, { text: "F1 score",       value:  260 },
-  { text: "cross-entropy",       value:  250 }, { text: "vector store",   value:  245 },
-  { text: "top-k",               value:  240 }, { text: "temperature",    value:  235 },
-  { text: "bias",                value:  230 }, { text: "variance",       value:  225 },
-  { text: "zero-shot",           value:  210 }, { text: "few-shot",       value:  205 },
-  { text: "chain-of-thought",    value:  200 }, { text: "quantization",   value:  195 },
-  { text: "KV cache",            value:  185 }, { text: "MoE",            value:  180 },
-  { text: "Mamba",               value:  175 }, { text: "PEFT",           value:  170 },
-  { text: "adapter",             value:  165 }, { text: "sparsity",       value:  160 },
-  { text: "head",                value:  155 }, { text: "layer norm",     value:  150 },
-  { text: "residual",            value:  145 }, { text: "pooling",        value:  140 },
-  { text: "stride",              value:  138 }, { text: "kernel",         value:  135 },
-  { text: "ablation",            value:  130 }, { text: "perceptron",     value:  125 },
-  { text: "eigenvalue",          value:  120 }, { text: "Jacobian",       value:  118 },
-  { text: "KL divergence",       value:  115 }, { text: "BLEU",           value:  112 },
-  { text: "ROUGE",               value:  110 }, { text: "MMLU",           value:  108 },
-  { text: "HumanEval",           value:  106 }, { text: "GSM8K",          value:  104 },
-  { text: "HellaSwag",           value:  102 }, { text: "LoRA rank",      value:  100 },
-  { text: "flash attention",     value:   95 }, { text: "speculative decoding", value: 90 },
-  { text: "grouped query",       value:   86 }, { text: "rotary embedding", value:  83 },
-  { text: "causal mask",         value:   80 }, { text: "label smoothing", value:  77 },
-  { text: "warmup",              value:   74 }, { text: "cosine decay",   value:   70 },
-  { text: "positional encoding", value:   67 }, { text: "sliding window", value:   63 },
-  { text: "mixture of experts",  value:   60 }, { text: "constitutional AI", value: 56 },
-];
-
-// 40 short common words all at the same value — reveals the spiral path via
-// colour-coded placement order.
-const spiralWords = [
-  "the","be","to","of","and","a","in","that","have","it",
-  "for","not","on","with","he","as","you","do","at","this",
-  "but","his","by","from","they","we","say","her","she","or",
-  "an","will","my","one","all","would","there","their","what","so",
-].map((text) => ({ text, value: 100 }));
-
-// ─── 1. Basic word cloud ──────────────────────────────────────────────────────
-
-(function demoBasic() {
-  const svg = svgCloud("cloud-basic");
-  cloud()
-    .size([W, H])
-    .words(techWords.map((d) => ({ ...d })))
-    .fontSize((d) => Math.sqrt(d.value) * 1.4)
-    .font("Impact, sans-serif")
-    .rotate(0).padding(3)
-    .on("end", (placed) => drawWords(svg, placed, (d, i) => palette(i)))
-    .start();
-
-  setCode("code-basic", `
-import { cloud } from "./src/index.js";
-
-const words = [
-  { text: "visualization", value: 2400 },
-  { text: "D3",            value: 2000 },
-  // … more words
-];
-
-cloud()
-  .size([500, 300])
-  .words(words)
-  .fontSize((d) => Math.sqrt(d.value) * 1.4)
-  .font("Impact, sans-serif")
-  .rotate(0)
-  .padding(3)
-  .on("end", (placed) => {
-    // x, y are centre-relative; shift by W/2, H/2 for SVG coords
-    svg.selectAll("text")
-      .data(placed)
-      .join("text")
-      .attr("text-anchor", "middle")
-      .attr("transform", (d) =>
-        \`translate(\${d.x + W/2},\${d.y + H/2}) rotate(\${d.rotate})\`)
-      .style("font-size",   (d) => \`\${d.size}px\`)
-      .style("font-family", (d) => d.font)
-      .style("fill",        (d, i) => palette(i))
-      .text((d) => d.text);
-  })
-  .start();
-`);
-})();
-
-// ─── 2. Incremental animation ─────────────────────────────────────────────────
-// After the src/index.js fix, "word" fires with centre-relative x/y — the same
-// coordinate system as the "end" event — so translate(d.x + W/2, d.y + H/2)
-// is correct in both handlers.
-
-(function demoIncremental() {
-  let layout = null;
-  let svgEl  = null;
-  let cursor = 0;
-
-  function initLayout() {
-    if (layout) { layout.stop(); layout = null; }
-    svgEl = svgCloud("cloud-incremental");
-    cursor = 0;
-    document.getElementById("word-count").textContent = "";
-
-    layout = cloud()
-      .size([W, H])
-      .fontSize((d) => Math.sqrt(d.value) * 1.5)
-      .font("'Trebuchet MS', sans-serif")
-      .padding(4)
-      .on("word", (d) => {
-        const cx = d.x + W / 2, cy = d.y + H / 2;
-        // Scale from 0 at the word's final position — a minimal "pop" entry.
-        svgEl.append("text")
-          .datum(d)
-          .attr("text-anchor", "middle")
-          .attr("transform", `translate(${cx},${cy}) rotate(${d.rotate}) scale(0.1)`)
-          .style("font-size",   `${d.size}px`)
-          .style("font-family", d.font)
-          .style("fill",        palette(d.text))
-          .style("opacity",     0)
-          .text(d.text)
-          .transition()
-          .duration(380)
-          .ease(d3.easeCubicOut)
-          .attr("transform", `translate(${cx},${cy}) rotate(${d.rotate}) scale(1)`)
-          .style("opacity", 1);
-      });
-  }
-
-  function addBatch() {
-    if (!layout) initLayout();
-    const batch = incrPool.slice(cursor, cursor + 5);
-    if (!batch.length) return;
-    cursor += batch.length;
-    layout.add(batch.map((d) => ({ ...d })));
-    document.getElementById("word-count").textContent =
-      `${layout.placed().length} word${layout.placed().length === 1 ? "" : "s"} placed`;
-  }
-
-  document.getElementById("btn-add").addEventListener("click", addBatch);
-  document.getElementById("btn-reset").addEventListener("click", () => {
-    if (layout) { layout.stop(); layout = null; }
-    svgEl = null; cursor = 0;
-    document.getElementById("word-count").textContent = "";
-    document.getElementById("cloud-incremental").innerHTML =
-      '<span class="loading">Click "Add 5 words" to begin</span>';
-  });
-
-  setCode("code-incremental", `
-// "word" fires with centre-relative x/y (same as "end").
-// Scale from 0.1 → 1 at the final position for a clean pop-in.
-const layout = cloud()
-  .size([500, 300])
-  .on("word", (d) => {
-    const cx = d.x + W / 2, cy = d.y + H / 2;
-    svg.append("text")
-      .attr("transform",
-        \`translate(\${cx},\${cy}) rotate(\${d.rotate}) scale(0.1)\`)
-      .style("opacity", 0)
-      .text(d.text)
-      .transition().duration(380).ease(d3.easeCubicOut)
-      .attr("transform",
-        \`translate(\${cx},\${cy}) rotate(\${d.rotate}) scale(1)\`)
-      .style("opacity", 1);
-  });
-
-layout.words(firstBatch).start();  // initialise board
-layout.add(nextBatch);             // extend without moving existing words
-layout.add(moreBatch);
-layout.clear().start();            // reset and rebuild
-`);
-})();
-
-// ─── 3. Dense packing ────────────────────────────────────────────────────────
-
-(function demoDense() {
-  const svg = svgCloud("cloud-dense", WD, HD);
-
-  const sizeScale = d3.scalePow().exponent(0.42)
-    .domain([56, 9800]).range([7, 62]).clamp(true);
-
-  // Map log-value to a vibrant hue range: large=warm, small=cool.
-  const colorScale = d3.scaleSequential(d3.interpolateRainbow)
-    .domain([Math.log(9800), Math.log(56)]);
-
-  cloud()
-    .size([WD, HD])
-    .words(denseWords.map((d) => ({ ...d })))
-    .fontSize((d) => sizeScale(d.value))
-    .font("'Arial Narrow', Arial, sans-serif")
-    .fontWeight((d) => d.value > 2000 ? "bold" : "normal")
-    .rotate((d) => d.value > 1000 ? 0 : (Math.random() < 0.6 ? 0 : 90))
-    .padding(1)
-    .on("end", (placed) =>
-      drawWords(svg, placed, (d) => colorScale(Math.log(d.value)), WD, HD))
-    .start();
-
-  setCode("code-dense", `
-// Power-law size mapping: a few huge terms, many tiny ones.
-const sizeScale = d3.scalePow().exponent(0.42)
-  .domain([56, 9800]).range([7, 62]);
-
-// Colour by log-value so the full rainbow spans the range.
-const colorScale = d3.scaleSequential(d3.interpolateRainbow)
-  .domain([Math.log(9800), Math.log(56)]);
-
-cloud()
-  .size([720, 420])
-  .words(hundredWords)           // ~100 items, values 56 – 9800
-  .fontSize((d) => sizeScale(d.value))
-  .font("'Arial Narrow', Arial, sans-serif")
-  .fontWeight((d) => d.value > 2000 ? "bold" : "normal")
-  // Large words stay horizontal; smaller ones may rotate.
-  .rotate((d) => d.value > 1000 ? 0 : (Math.random() < 0.6 ? 0 : 90))
-  .padding(1)                    // tight packing
-  .on("end", (placed) => {
-    svg.selectAll("text").data(placed).join("text")
-      /* … position … */
-      .style("fill", (d) => colorScale(Math.log(d.value)));
-  })
-  .start();
-`);
-})();
-
-// ─── 4. Spiral patterns ───────────────────────────────────────────────────────
-// Uniform-size words + colour-by-placement-order + the raw spiral path
-// drawn as a dashed line make each strategy's geometry unmistakable.
-
-(function demoSpirals() {
-  function makeCloud(containerId, spiralName) {
-    const svg = svgCloud(containerId);
-
-    // Draw the raw mathematical spiral path for visual reference.
-    const rng0 = seeded(42);
-    const sf = spirals[spiralName]([W, H]);
-    const pts = [];
-    for (let t = 1; t <= 600; t += 2) {
-      const [dx, dy] = sf(t);
-      const x = W / 2 + dx, y = H / 2 + dy;
-      if (x < -10 || x > W + 10 || y < -10 || y > H + 10) break;
-      pts.push([x, y]);
-    }
-    svg.append("path")
-      .attr("d", d3.line()(pts))
-      .attr("fill", "none")
-      .attr("stroke", "#d1d5db")
-      .attr("stroke-width", 1)
-      .attr("stroke-dasharray", "4 3");
-
-    // Colour by placement index: purple (first/centre) → yellow (last/edge).
-    const orderColor = d3.scaleSequential(d3.interpolatePlasma)
-      .domain([0, spiralWords.length - 1]);
-
-    cloud()
-      .size([W, H])
-      .words(spiralWords.map((d) => ({ ...d })))
-      .fontSize(() => 13)          // uniform size — reveals the pattern
-      .font("'Courier New', monospace")
-      .rotate(0)                   // all horizontal — clean grid-like layout
-      .padding(2)
-      .spiral(spiralName)
-      .random(seeded(42))          // same seed for fair side-by-side
-      .on("end", (placed) => {
-        svg.selectAll("text")
-          .data(placed)
-          .join("text")
-          .attr("text-anchor", "middle")
-          .attr("transform", (d) => `translate(${d.x + W / 2},${d.y + H / 2})`)
-          .style("font-size", "13px")
-          .style("font-family", "'Courier New', monospace")
-          .style("font-weight", "bold")
-          .style("fill", (d, i) => orderColor(i))
-          .style("opacity", 0)
-          .text((d) => d.text)
-          .transition().duration(300).style("opacity", 1);
-      })
-      .start();
-  }
-
-  makeCloud("cloud-archimedean", "archimedean");
-  makeCloud("cloud-rectangular", "rectangular");
-
-  setCode("code-spirals", `
-import { cloud, spirals } from "./src/index.js";
-
-// Colour words by their placement index to trace the search path.
-const orderColor = d3.scaleSequential(d3.interpolatePlasma)
-  .domain([0, words.length - 1]);
-
-cloud()
-  .spiral("archimedean")  // or "rectangular"
-  .on("end", (placed) => {
-    svg.selectAll("text").data(placed).join("text")
-      .style("fill", (d, i) => orderColor(i));
-  })
-  .start();
-
-// Draw the raw spiral path for overlay:
-const sf = spirals.archimedean([W, H]);
-const pts = Array.from({length: 300}, (_, i) => {
-  const [dx, dy] = sf(i * 2 + 1);
-  return [W/2 + dx, H/2 + dy];
-});
-svg.append("path").attr("d", d3.line()(pts))
-  .attr("stroke", "#d1d5db").attr("fill", "none");
-
-// Custom spiral factory:
-cloud().spiral((size) => {
-  return (t) => [Math.cos(t * 0.2) * t * 0.8, Math.sin(t * 0.2) * t * 0.8];
-}).start();
-`);
-})();
-
-// ─── 5. Rotation modes ────────────────────────────────────────────────────────
-
-(function demoRotation() {
-  const words = techWords.slice(0, 14).map((d) => ({ ...d }));
-  const cfgs = [
-    { id: "cloud-rot-0",    rotate: () => 0 },
-    { id: "cloud-rot-90",   rotate: (d, i) => (i % 3 === 0 ? 90 : 0) },
-    { id: "cloud-rot-rand", rotate: () => (Math.floor(Math.random() * 7) - 3) * 15 },
-  ];
-  for (const cfg of cfgs) {
-    const svg = svgCloud(cfg.id);
-    cloud()
-      .size([W, H]).words(words.map((d) => ({ ...d })))
-      .fontSize((d) => Math.sqrt(d.value) * 1.3)
-      .font("'Verdana', sans-serif").padding(3)
-      .rotate(cfg.rotate).random(seeded(7))
-      .on("end", (placed) => drawWords(svg, placed, (d, i) => coolPal(i)))
-      .start();
-  }
-  setCode("code-rotation", `
-// Rotation accessor: (datum, index) → degrees.
-
-cloud().rotate(0).start();                            // horizontal only
-
-cloud().rotate((d, i) => i % 3 === 0 ? 90 : 0)      // 0° / 90° mix
-  .start();
-
-cloud().rotate(() =>                                   // random multiples of 15°
-  (Math.floor(Math.random() * 7) - 3) * 15
-).start();
-
-cloud().rotate(() =>                                   // classic ±30° / ±60°
-  (~~(Math.random() * 6) - 3) * 30
-).start();
-`);
-})();
-
-// ─── 6. Color & font ──────────────────────────────────────────────────────────
-
-(function demoColor() {
-  const svg = svgCloud("cloud-color");
-  const sizeScale  = d3.scaleLinear().domain([0, d3.max(techWords, (d) => d.value)]).range([12, 72]);
-  const colorScale = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(techWords, (d) => d.value)]);
-
-  cloud()
-    .size([W, H]).words(techWords.map((d) => ({ ...d })))
-    .fontSize((d) => sizeScale(d.value))
-    .font("'Helvetica Neue', Arial, sans-serif")
-    .fontWeight((d) => d.value > 1000 ? "bold" : "normal")
-    .rotate(() => (Math.random() < 0.7 ? 0 : 90)).padding(4)
-    .on("end", (placed) => drawWords(svg, placed, (d) => colorScale(d.value)))
-    .start();
-
-  setCode("code-color", `
-const sizeScale = d3.scaleLinear()
-  .domain([0, d3.max(words, (d) => d.value)]).range([12, 72]);
-
-// Larger words → deeper blue.
-const colorScale = d3.scaleSequential(d3.interpolateBlues)
-  .domain([0, d3.max(words, (d) => d.value)]);
-
-cloud()
-  .fontSize((d) => sizeScale(d.value))
-  .fontWeight((d) => d.value > 1000 ? "bold" : "normal")
-  .rotate(() => Math.random() < 0.7 ? 0 : 90)
-  .padding(4)
-  .on("end", (placed) => {
-    svg.selectAll("text").data(placed).join("text")
-      /* … position … */
-      .style("fill", (d) => colorScale(d.value));
-    // Any D3 scale: schemeTableau10, interpolateRainbow, etc.
-  })
-  .start();
-`);
-})();
-
-// ─── Install section code ─────────────────────────────────────────────────────
-
-setCode("install-esm", `
-// ESM (bundler or import map)
-import { cloud } from "d3-wordcloud";
-
-// ESM directly in browser (import map required for d3-dispatch)
-// <script type="importmap">
-// { "imports": { "d3-dispatch": "https://cdn.jsdelivr.net/npm/d3-dispatch@3/+esm" } }
-// <\/script>
-import { cloud } from "./node_modules/d3-wordcloud/src/index.js";
-
-// UMD via CDN — adds d3.cloud to the global d3 object
-// <script src="https://cdn.jsdelivr.net/npm/d3-wordcloud/dist/d3-wordcloud.min.js"><\/script>
-// const layout = d3.cloud();
-`);
-
-// ─── Syntax highlighting ──────────────────────────────────────────────────────
-
-function setCode(id, str) {
-  const lines = str.split("\n").filter((l) => l.trim().length > 0);
-  const indent = Math.min(...lines.map((l) => l.match(/^(\s*)/)[1].length));
-  const el = document.getElementById(id);
-  el.textContent = str.split("\n").map((l) => l.slice(indent)).join("\n").trim();
-  hljs.highlightElement(el); // hljs is loaded as a plain <script> above
+function currentPreset() {
+  return PRESETS[state.activePreset] ?? PRESETS[0];
 }
-</script>
 
+// ── Color assignment ───────────────────────────────────────────────────────
+function getWordColor(index) {
+  const palette = PALETTES[state.palette];
+  return palette[index % palette.length];
+}
+
+function refreshWordColors() {
+  state.words.forEach((w, i) => { w.color = getWordColor(i); });
+}
+
+// ── Size scale ─────────────────────────────────────────────────────────────
+function buildSizeScale(words) {
+  const vals = words.map(w => w.value);
+  const [lo, hi] = d3.extent(vals);
+  if (lo === hi) return () => (state.minSize + state.maxSize) / 2;
+  return d3.scaleSqrt().domain([lo, hi]).range([state.minSize, state.maxSize]);
+}
+
+// ── Rotation function ──────────────────────────────────────────────────────
+function rotateFn(rng) {
+  return (d, i) => {
+    if (state.rotation === "0")    return 0;
+    if (state.rotation === "90")   return i % 3 === 0 ? 90 : 0;
+    return rng() < 0.25 ? 90 : 0;
+  };
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+function showTooltip(text, event) {
+  $tooltip.textContent = text;
+  $tooltip.classList.add("visible");
+  moveTooltip(event);
+}
+
+function moveTooltip(event) {
+  $tooltip.style.left = (event.clientX + 14) + "px";
+  $tooltip.style.top  = (event.clientY - 32) + "px";
+}
+
+function hideTooltip() {
+  $tooltip.classList.remove("visible");
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ── Animated number ────────────────────────────────────────────────────────
+function animNum(id, to) {
+  const el = document.getElementById(id);
+  const from = +(el.dataset.n || 0);
+  el.dataset.n = to;
+  if (!state.animation) { el.firstChild.textContent = Math.round(to); return; }
+  const start = performance.now();
+  const dur = 400;
+  function tick(now) {
+    const t = Math.min((now - start) / dur, 1);
+    const v = from + (to - from) * (1 - Math.pow(1 - t, 3));
+    if (el.firstChild) el.firstChild.textContent = Math.round(v);
+    else el.textContent = Math.round(v);
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ── Stats update ───────────────────────────────────────────────────────────
+function updateStats(placed, bounds, w, h) {
+  const n = placed.length;
+  const largest = n ? Math.round(d3.max(placed, d => d.size)) : 0;
+  let footprint = "—", coverage = 0;
+  if (bounds) {
+    const bw = Math.round(bounds[1].x - bounds[0].x);
+    const bh = Math.round(bounds[1].y - bounds[0].y);
+    footprint = `${bw}×${bh}`;
+    coverage = Math.min(100, Math.round((bw * bh) / (w * h) * 100));
+  }
+  document.getElementById("stat-placed").textContent = n;
+  document.getElementById("stat-footprint").textContent = footprint;
+  document.getElementById("stat-largest").innerHTML = `${largest}<span style="font-size:14px;font-weight:600">px</span>`;
+  document.getElementById("stat-coverage").innerHTML = `${coverage}<span style="font-size:14px;font-weight:600">%</span>`;
+}
+
+// ── SVG setup ──────────────────────────────────────────────────────────────
+function setupSvg(container, w, h) {
+  const el = typeof container === "string"
+    ? document.getElementById(container)
+    : container;
+  el.innerHTML = "";
+  const svg = d3.select(el)
+    .append("svg")
+    .attr("viewBox", `0 0 ${w} ${h}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .attr("width", "100%")
+    .attr("height", "100%");
+  return svg;
+}
+
+// ── Draw grid (decorative) ─────────────────────────────────────────────────
+function drawGridLines(svg, w, h, dark) {
+  const stroke = dark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.05)";
+  const centerStroke = dark ? "rgba(99,102,241,0.3)" : "rgba(79,70,229,0.2)";
+
+  const g = svg.append("g").attr("class", "grid");
+  g.append("line").attr("x1", w/2).attr("y1", 0).attr("x2", w/2).attr("y2", h)
+    .attr("stroke", centerStroke).attr("stroke-dasharray", "4 4");
+  g.append("line").attr("x1", 0).attr("y1", h/2).attr("x2", w).attr("y2", h/2)
+    .attr("stroke", centerStroke).attr("stroke-dasharray", "4 4");
+  [0.22, 0.42].forEach(r => {
+    g.append("circle").attr("cx", w/2).attr("cy", h/2).attr("r", Math.min(w,h)*r)
+      .attr("fill", "none").attr("stroke", stroke);
+  });
+}
+
+// ── Bounds overlay ─────────────────────────────────────────────────────────
+function drawBounds(layer, bounds, w, h, color, animated) {
+  layer.selectAll(".bounds-rect").remove();
+  if (!bounds) return;
+  const x = bounds[0].x + w/2;
+  const y = bounds[0].y + h/2;
+  const bw = bounds[1].x - bounds[0].x;
+  const bh = bounds[1].y - bounds[0].y;
+  const rect = layer.append("rect")
+    .attr("class", "bounds-rect")
+    .attr("fill", d3.color(color).copy({opacity: 0.06}).formatRgb())
+    .attr("stroke", color)
+    .attr("stroke-width", 1.5)
+    .attr("stroke-dasharray", "6 4")
+    .attr("rx", 4);
+
+  if (animated) {
+    rect.attr("x", w/2).attr("y", h/2).attr("width", 0).attr("height", 0)
+      .transition().duration(600).ease(d3.easeCubicOut)
+      .attr("x", x).attr("y", y).attr("width", bw).attr("height", bh);
+  } else {
+    rect.attr("x", x).attr("y", y).attr("width", bw).attr("height", bh);
+  }
+}
+
+// ── MAIN CLOUD ─────────────────────────────────────────────────────────────
+let mainSvg = null;
+let mainWordsGroup = null;
+let mainBoundsGroup = null;
+
+function initMainSvg() {
+  const dark = state.bgStyle === "dark";
+  mainSvg = setupSvg("main-cloud", MAIN_W, MAIN_H);
+  drawGridLines(mainSvg, MAIN_W, MAIN_H, dark);
+  mainBoundsGroup = mainSvg.append("g").attr("class", "bounds-layer");
+  mainWordsGroup  = mainSvg.append("g").attr("class", "words-layer");
+}
+
+async function renderMainCloud() {
+  const v = ++mainVersion;
+  const words = state.words;
+  const empty = words.length === 0;
+
+  $cloudEmpty.classList.toggle("visible", empty);
+  document.getElementById("cloud-title").textContent =
+    empty ? "Live word cloud" : `${words.length} word${words.length > 1 ? "s" : ""} in cloud`;
+  document.getElementById("cloud-sub").textContent =
+    empty ? "Add words on the left to see the cloud" :
+    `${state.spiral} spiral · ${state.rotation} rotation · ${state.padding}px padding`;
+
+  if (empty) {
+    mainWordsGroup?.selectAll("*").remove();
+    mainBoundsGroup?.selectAll("*").remove();
+    updateStats([], null, MAIN_W, MAIN_H);
+    return;
+  }
+
+  if (!mainSvg) initMainSvg();
+
+  const rng = seededRng(state.shuffleSeed);
+  const sizeScale = buildSizeScale(words);
+
+  const layout = cloud()
+    .size([MAIN_W, MAIN_H])
+    .words(words.map(d => ({ ...d })))
+    .font(state.font)
+    .fontWeight(d => d.value > 100 ? "800" : d.value > 60 ? "600" : "500")
+    .fontSize(d => sizeScale(d.value))
+    .padding(state.padding)
+    .rotate(rotateFn(rng))
+    .spiral(state.spiral)
+    .random(rng)
+    .timeInterval(Infinity);
+
+  const result = await layout.startAsync();
+  if (v !== mainVersion) return;
+
+  updateStats(result.words, result.bounds, MAIN_W, MAIN_H);
+
+  // Draw bounds
+  const accentColor = PALETTES[state.palette][0];
+  drawBounds(mainBoundsGroup, result.bounds, MAIN_W, MAIN_H, accentColor, state.animation);
+
+  // Data join
+  const sel = mainWordsGroup.selectAll("text.main-word")
+    .data(result.words, d => d.text);
+
+  const dur = state.animation ? 700 : 0;
+
+  sel.join(
+    enter => enter.append("text")
+      .attr("class", "main-word cloud-word")
+      .attr("text-anchor", "middle")
+      .attr("font-family", state.font)
+      .attr("font-weight", d => d.weight)
+      .attr("font-size", "2px")
+      .attr("fill", d => d.color)
+      .attr("opacity", 0)
+      .attr("transform", d => `translate(${d.x + MAIN_W/2},${d.y + MAIN_H/2}) rotate(${d.rotate})`)
+      .text(d => d.text)
+      .call(attachWordEvents)
+      .call(e => e.transition().duration(dur).ease(d3.easeBackOut.overshoot(1.3))
+        .attr("opacity", 1)
+        .attr("font-size", d => `${d.size}px`)),
+
+    update => update
+      .call(attachWordEvents)
+      .call(u => u.interrupt().transition().duration(dur).ease(d3.easeCubicOut)
+        .attr("fill", d => d.color)
+        .attr("font-size", d => `${d.size}px`)
+        .attr("font-family", state.font)
+        .attr("font-weight", d => d.weight)
+        .attr("transform", d => `translate(${d.x + MAIN_W/2},${d.y + MAIN_H/2}) rotate(${d.rotate})`)
+        .attr("opacity", 1)),
+
+    exit => exit.interrupt()
+      .transition().duration(state.animation ? 250 : 0).ease(d3.easeCubicIn)
+      .attr("opacity", 0)
+      .attr("font-size", "2px")
+      .remove(),
+  );
+}
+
+// ── Word list UI ───────────────────────────────────────────────────────────
+function renderWordList() {
+  $wordCount.textContent = state.words.length;
+
+  if (state.words.length === 0) {
+    $wordList.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">
+      Add words above to get started
+    </div>`;
+    return;
+  }
+
+  const maxVal = d3.max(state.words, w => w.value) || 1;
+
+  $wordList.innerHTML = state.words.map((w, i) => `
+    <div class="word-item" data-idx="${i}">
+      <span class="word-item-color" style="background:${w.color}"></span>
+      <span class="word-item-text" title="${w.text}">${w.text}</span>
+      <div class="word-item-bar">
+        <div class="word-item-bar-fill" style="width:${(w.value/maxVal*100).toFixed(1)}%;background:${w.color}"></div>
+      </div>
+      <span class="word-item-weight">${w.value}</span>
+      <button class="btn btn-danger" data-remove="${i}" title="Remove">✕</button>
+    </div>
+  `).join("");
+
+  $wordList.querySelectorAll("[data-remove]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      removeWord(+btn.dataset.remove);
+    });
+  });
+}
+
+function renderPresetButtonsActive() {
+  presetGrid.querySelectorAll(".preset-btn").forEach((btn, index) => {
+    btn.classList.toggle("active", index === state.activePreset);
+  });
+  document.getElementById("preset-status").textContent =
+    `Active preset: ${currentPreset().name}. Stream Lab and Spiral Comparison follow this dataset.`;
+}
+
+// ── Add / Remove words ─────────────────────────────────────────────────────
+function addWord(text, value) {
+  text = text.trim();
+  if (!text) return false;
+  value = Math.max(1, Math.min(200, +value || 50));
+
+  const existing = state.words.find(w => w.text.toLowerCase() === text.toLowerCase());
+  if (existing) {
+    // Boost weight in place — no full re-render needed
+    existing.value = Math.min(200, existing.value + value);
+    renderWordList();
+    boostWordInCloud(existing);
+    toast(`Boosted "${existing.text}" → weight ${existing.value}`);
+    return true;
+  }
+
+  const color = getWordColor(state.words.length);
+  state.words.push({ text, value, color });
+  renderWordList();
+  renderMainCloud();
+  return true;
+}
+
+// Re-run full layout after a weight boost so the bitmap stays consistent.
+// The D3 join animates each word to its new collision-free position.
+function boostWordInCloud(_wordDatum) {
+  renderMainCloud();
+}
+
+function removeWord(idx) {
+  if (idx < 0 || idx >= state.words.length) return;
+  const removed = state.words.splice(idx, 1)[0];
+  refreshWordColors();
+  renderWordList();
+  // The exit selection in renderMainCloud handles the shrink-out animation;
+  // update selection moves remaining words to their new collision-free positions.
+  renderMainCloud();
+  toast(`Removed "${removed.text}"`);
+}
+
+function attachWordEvents(sel) {
+  sel
+    .on("mouseenter", function(event, d) {
+      showTooltip(`${d.text} · weight ${d.value} · ${Math.round(d.size)}px`, event);
+      d3.select(this).attr("opacity", 0.75);
+    })
+    .on("mousemove", moveTooltip)
+    .on("mouseleave", function() {
+      hideTooltip();
+      d3.select(this).attr("opacity", 1);
+    })
+    .on("click", (_, d) => {
+      const idx = state.words.findIndex(w => w.text === d.text);
+      if (idx >= 0) removeWord(idx);
+    });
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+function bindSegmented(id, stateKey, onChange) {
+  const el = document.getElementById(id);
+  el.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      el.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state[stateKey] = btn.dataset.val;
+      onChange?.();
+    });
+  });
+}
+
+function bindRange(id, stateKey, displayId, format, onChange) {
+  const input = document.getElementById(id);
+  const display = document.getElementById(displayId);
+  input.addEventListener("input", () => {
+    state[stateKey] = +input.value;
+    display.textContent = format(+input.value);
+    onChange?.();
+  });
+}
+
+function scheduleMainRender(delay = 90) {
+  clearTimeout(mainRenderTimer);
+  mainRenderTimer = setTimeout(() => {
+    renderMainCloud();
+  }, delay);
+}
+
+// Spiral
+bindSegmented("spiral-control", "spiral", renderMainCloud);
+
+// Rotation
+bindSegmented("rotation-control", "rotation", renderMainCloud);
+
+// Padding
+bindRange("range-padding", "padding", "val-padding", v => v, scheduleMainRender);
+
+// Min/Max size
+bindRange("range-min-size", "minSize", "val-min-size", v => `${v}px`, scheduleMainRender);
+bindRange("range-max-size", "maxSize", "val-max-size", v => `${v}px`, scheduleMainRender);
+
+// Font
+bindSegmented("font-control", "font", renderMainCloud);
+
+// Palette
+bindSegmented("palette-control", "palette", () => {
+  refreshWordColors();
+  renderWordList();
+  renderMainCloud();
+});
+
+// Add word
+$addBtn.addEventListener("click", () => {
+  if (addWord($wordInput.value, $weightInput.value)) {
+    $wordInput.value = "";
+    $wordInput.focus();
+  }
+});
+
+$wordInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    if (addWord($wordInput.value, $weightInput.value)) {
+      $wordInput.value = "";
+    }
+  }
+});
+
+// Clear all
+document.getElementById("btn-clear-all").addEventListener("click", () => {
+  if (state.words.length === 0) return;
+  state.words = [];
+  renderWordList();
+  renderMainCloud();
+  toast("Cleared all words");
+});
+
+// Sort
+document.getElementById("btn-sort").addEventListener("click", () => {
+  state.words.sort((a, b) => sortAscending ? b.value - a.value : a.value - b.value);
+  sortAscending = !sortAscending;
+  refreshWordColors();
+  renderWordList();
+  renderMainCloud();
+});
+
+// Export JSON
+document.getElementById("btn-export").addEventListener("click", () => {
+  const data = JSON.stringify(state.words.map(w => ({ text: w.text, value: w.value })), null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "wordcloud.json"; a.click();
+  URL.revokeObjectURL(url);
+  toast("Exported wordcloud.json");
+});
+
+// Shuffle
+document.getElementById("btn-shuffle").addEventListener("click", () => {
+  state.shuffleSeed += 1;
+  renderMainCloud();
+});
+
+// Download SVG
+document.getElementById("btn-download").addEventListener("click", () => {
+  if (!mainSvg) return;
+  const svgEl = mainSvg.node();
+  const blob = new Blob([svgEl.outerHTML], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "wordcloud.svg"; a.click();
+  URL.revokeObjectURL(url);
+  toast("Downloaded wordcloud.svg");
+});
+
+// Animation toggle
+const $animToggle = document.getElementById("btn-animate-toggle");
+const $animLabel = document.getElementById("btn-anim-label");
+$animToggle.addEventListener("click", () => {
+  state.animation = !state.animation;
+  $animToggle.classList.toggle("active", state.animation);
+  $animToggle.title = state.animation ? "Animation on" : "Animation off";
+  $animToggle.querySelector(".icon").textContent = state.animation ? "◎" : "◌";
+  $animLabel.textContent = state.animation ? "Motion" : "Static";
+});
+$animToggle.classList.add("active");
+
+// Background toggle
+const BG_CYCLES = ["light", "dark", "gradient"];
+const BG_ICONS  = { light: "☀", dark: "☽", gradient: "◈" };
+const $bgToggle = document.getElementById("btn-bg-toggle");
+const $bgLabel = document.getElementById("btn-bg-label");
+$bgToggle.addEventListener("click", () => {
+  const idx = BG_CYCLES.indexOf(state.bgStyle);
+  state.bgStyle = BG_CYCLES[(idx + 1) % BG_CYCLES.length];
+  $bgToggle.querySelector(".icon").textContent = BG_ICONS[state.bgStyle];
+  $bgLabel.textContent = state.bgStyle[0].toUpperCase() + state.bgStyle.slice(1);
+  const canvas = document.getElementById("main-cloud");
+  canvas.className = `cloud-canvas ${state.bgStyle}-bg`;
+  // Re-init SVG (background affects grid line colors)
+  mainSvg = null; mainWordsGroup = null; mainBoundsGroup = null;
+  initMainSvg();
+  renderMainCloud();
+});
+
+// ── Presets ────────────────────────────────────────────────────────────────
+const presetGrid = document.getElementById("preset-grid");
+PRESETS.forEach(preset => {
+  const btn = document.createElement("button");
+  btn.className = "preset-btn";
+  btn.innerHTML = `<span class="preset-name">${preset.name}</span><span class="preset-count">${preset.words.length} words</span>`;
+  btn.addEventListener("click", () => {
+    state.activePreset = PRESETS.indexOf(preset);
+    state.words = preset.words.map(([text, value], i) => ({
+      text, value, color: getWordColor(i)
+    }));
+    renderPresetButtonsActive();
+    renderWordList();
+    renderMainCloud();
+    resetStream();
+    renderComparison();
+    toast(`Loaded "${preset.name}" preset`);
+  });
+  presetGrid.appendChild(btn);
+});
+renderPresetButtonsActive();
+
+// ── Custom palette swatches ────────────────────────────────────────────────
+const customPaletteEl = document.getElementById("custom-palette");
+["#4f46e5","#7c3aed","#0d9488","#d97706","#e11d48","#0284c7","#16a34a","#ea580c"].forEach((color, i) => {
+  const sw = document.createElement("div");
+  sw.className = "palette-swatch" + (i === 0 ? " active" : "");
+  sw.style.background = color;
+  sw.title = color;
+  sw.addEventListener("click", () => {
+    customPaletteEl.querySelectorAll(".palette-swatch").forEach(s => s.classList.remove("active"));
+    sw.classList.add("active");
+    PALETTES.vivid[0] = color;
+    refreshWordColors();
+    renderWordList();
+    renderMainCloud();
+  });
+  customPaletteEl.appendChild(sw);
+});
+
+// ── STREAM LAB ─────────────────────────────────────────────────────────────
+let streamSvg = null;
+let streamWordsGroup = null;
+let streamBoundsGroup = null;
+
+function initStreamSvg() {
+  streamSvg = setupSvg("stream-cloud", STREAM_W, STREAM_H);
+  drawGridLines(streamSvg, STREAM_W, STREAM_H, true);
+  streamBoundsGroup = streamSvg.append("g").attr("class", "bounds-layer");
+  streamWordsGroup  = streamSvg.append("g").attr("class", "words-layer");
+}
+
+async function resetStream() {
+  stopStreamAuto();
+  streamCursor = 0;
+  streamWordCount = 0;
+  streamStartTime = null;
+
+  const preset = currentPreset();
+  const pack = preset.words;
+  streamAllWords = pack.map(([text, value], i) => ({
+    text, value, color: PALETTES.vivid[i % PALETTES.vivid.length]
+  }));
+
+  initStreamSvg();
+  document.getElementById("stream-stat-total").textContent = "0";
+  document.getElementById("stream-stat-burst").textContent = "0";
+  document.getElementById("stream-stat-bounds").textContent = "—";
+  document.getElementById("stream-count-label").textContent = "0 words";
+  document.getElementById("stream-sub").textContent = `Idle — inject a burst or start auto stream for ${preset.name}`;
+  document.getElementById("arrivals-list").innerHTML =
+    `<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">No arrivals yet</div>`;
+  document.getElementById("stream-speed-label").textContent = "≈0 words/s";
+
+  const rng = seededRng(300);
+  const sizeScale = buildSizeScale(streamAllWords);
+
+  streamLayout = cloud()
+    .size([STREAM_W, STREAM_H])
+    .words([])
+    .font("Inter, sans-serif")
+    .fontWeight(d => d.value > 100 ? "700" : "500")
+    .fontSize(d => sizeScale(d.value))
+    .padding(3)
+    .rotate((d, i) => i % 5 === 0 ? 90 : 0)
+    .spiral("archimedean")
+    .random(rng)
+    .timeInterval(Infinity);
+
+  // Initial burst
+  await addStreamBurst(8, true);
+}
+
+async function addStreamBurst(count = 6, silent = false) {
+  if (!streamLayout) return;
+  if (streamCursor >= streamAllWords.length) {
+    streamCursor = 0;
+    initStreamSvg();
+    streamWordCount = 0;
+    streamLayout.clear();
+  }
+
+  const batch = streamAllWords.slice(streamCursor, streamCursor + count).map(d => ({ ...d }));
+  streamCursor += batch.length;
+  if (!batch.length) return;
+
+  if (!streamStartTime) streamStartTime = Date.now();
+
+  const result = await streamLayout.addAsync(batch);
+  streamWordCount += result.words.length;
+
+  // Render all placed words (incremental join)
+  const placed = streamLayout.placed();
+  const bounds = streamLayout.bounds();
+
+  const dur = 420;
+  streamWordsGroup.selectAll("text.stream-word")
+    .data(placed, d => d.text)
+    .join(
+      enter => enter.append("text")
+        .attr("class", "stream-word cloud-word")
+        .attr("text-anchor", "middle")
+        .attr("font-family", "Inter, sans-serif")
+        .attr("font-weight", d => d.weight)
+        .attr("font-size", d => `${d.size}px`)
+        .attr("fill", d => d.color)
+        .attr("opacity", 0)
+        .attr("transform", `translate(${STREAM_W/2},${STREAM_H/2}) scale(0.2)`)
+        .text(d => d.text)
+        .on("mouseenter", (event, d) => showTooltip(`${d.text} · ${d.value}`, event))
+        .on("mousemove", moveTooltip)
+        .on("mouseleave", hideTooltip)
+        .call(e => e.transition().duration(dur).ease(d3.easeBackOut.overshoot(1.2))
+          .attr("opacity", 1)
+          .attr("transform", d => `translate(${d.x + STREAM_W/2},${d.y + STREAM_H/2}) rotate(${d.rotate})`)),
+      update => update,
+    );
+
+  drawBounds(streamBoundsGroup, bounds, STREAM_W, STREAM_H, "#818cf8", state.animation);
+
+  // Stats
+  const bw = bounds ? Math.round(bounds[1].x - bounds[0].x) : 0;
+  const bh = bounds ? Math.round(bounds[1].y - bounds[0].y) : 0;
+  document.getElementById("stream-stat-total").textContent = streamWordCount;
+  document.getElementById("stream-stat-burst").textContent = result.words.length;
+  document.getElementById("stream-stat-bounds").textContent = bounds ? `${bw}×${bh}` : "—";
+  document.getElementById("stream-count-label").textContent = `${streamWordCount} word${streamWordCount !== 1 ? "s" : ""}`;
+
+  if (!silent) {
+    const elapsed = (Date.now() - streamStartTime) / 1000;
+    const rate = elapsed > 0 ? (streamWordCount / elapsed).toFixed(1) : "0";
+    document.getElementById("stream-speed-label").textContent = `≈${rate} words/s`;
+    document.getElementById("stream-sub").textContent =
+      `Last burst: ${result.words.length} words placed into existing board`;
+  }
+
+  // Arrivals list
+  const listEl = document.getElementById("arrivals-list");
+  const items = batch.slice().reverse().slice(0, 6);
+  const rows = items.map(d => `
+    <div class="arrival-item">
+      <span class="arrival-item-text">${d.text}</span>
+      <span class="arrival-item-val">weight ${d.value}</span>
+    </div>
+  `).join("");
+  listEl.innerHTML = rows + (listEl.innerHTML.startsWith("<div class=\"arrival-item\">") ? listEl.innerHTML : "");
+  // Trim to last 20
+  const all = listEl.querySelectorAll(".arrival-item");
+  if (all.length > 20) [...all].slice(20).forEach(n => n.remove());
+}
+
+function stopStreamAuto() {
+  if (streamTimer) { clearInterval(streamTimer); streamTimer = null; }
+  document.getElementById("stream-auto-btn").textContent = "▶ Auto stream";
+  document.getElementById("stream-auto-btn").classList.remove("btn-primary");
+  document.getElementById("stream-auto-btn").classList.add("btn-secondary");
+}
+
+document.getElementById("stream-burst-btn").addEventListener("click", () => addStreamBurst(6));
+document.getElementById("stream-reset-btn").addEventListener("click", resetStream);
+document.getElementById("stream-auto-btn").addEventListener("click", () => {
+  if (streamTimer) {
+    stopStreamAuto();
+  } else {
+    streamTimer = setInterval(() => addStreamBurst(5), 1200);
+    const btn = document.getElementById("stream-auto-btn");
+    btn.textContent = "⏸ Pause";
+    btn.classList.remove("btn-secondary");
+    btn.classList.add("btn-primary");
+  }
+});
+
+// ── SPIRAL COMPARE ─────────────────────────────────────────────────────────
+async function renderComparison() {
+  const preset = currentPreset();
+  const words = preset.words.slice(0, 24).map(([text, value], i) => ({
+    text, value, color: PALETTES.vivid[i % PALETTES.vivid.length]
+  }));
+
+  await Promise.all([
+    renderCompare("arch-cloud", words, "archimedean", compareSeed, "arch"),
+    renderCompare("rect-cloud", words, "rectangular", compareSeed, "rect"),
+  ]);
+}
+
+async function renderCompare(containerId, words, spiralName, seed, prefix) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = "";
+  const svg = d3.select(el)
+    .append("svg")
+    .attr("viewBox", `0 0 ${CMP_W} ${CMP_H}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .attr("width", "100%").attr("height", "100%");
+
+  drawGridLines(svg, CMP_W, CMP_H, false);
+
+  const rng = seededRng(seed + (spiralName === "rectangular" ? 23 : 0));
+  const sizeScale = d3.scaleSqrt()
+    .domain(d3.extent(words, w => w.value))
+    .range([12, 52]);
+
+  const layout = cloud()
+    .size([CMP_W, CMP_H])
+    .words(words.map(d => ({ ...d })))
+    .font("Inter, sans-serif")
+    .fontWeight(d => d.value > 110 ? "700" : "500")
+    .fontSize(d => sizeScale(d.value))
+    .padding(2)
+    .rotate((d, i) => i % 6 === 0 ? 90 : 0)
+    .spiral(spiralName)
+    .random(rng)
+    .timeInterval(Infinity);
+
+  const result = await layout.startAsync();
+
+  // Draw spiral path
+  const spiralFactory = spirals[spiralName]([CMP_W, CMP_H]);
+  const pts = [];
+  for (let t = 0; t < 360; t += 2) {
+    const [dx, dy] = spiralFactory(t + 1);
+    const x = CMP_W/2 + dx, y = CMP_H/2 + dy;
+    if (x > -20 && x < CMP_W+20 && y > -20 && y < CMP_H+20) pts.push([x, y]);
+  }
+  const spiralColor = spiralName === "archimedean" ? "rgba(79,70,229,0.2)" : "rgba(124,58,237,0.2)";
+  svg.append("path")
+    .attr("d", d3.line()(pts))
+    .attr("fill", "none")
+    .attr("stroke", spiralColor)
+    .attr("stroke-width", 1.5)
+    .attr("stroke-dasharray", "3 5");
+
+  // Bounds
+  const boundsLayer = svg.append("g");
+  const boundsColor = spiralName === "archimedean" ? "#4f46e5" : "#7c3aed";
+  drawBounds(boundsLayer, result.bounds, CMP_W, CMP_H, boundsColor, state.animation);
+
+  // Words
+  const wordsLayer = svg.append("g");
+  renderWords(wordsLayer, result.words, {
+    width: CMP_W, height: CMP_H,
+    key: d => d.text,
+    fill: d => d.color,
+    title: d => `${d.text}: ${d.value}`,
+  });
+
+  wordsLayer.selectAll("text")
+    .attr("opacity", 0)
+    .on("mouseenter", function(event, d) { showTooltip(`${d.text} · ${d.value}`, event); })
+    .on("mousemove", moveTooltip)
+    .on("mouseleave", hideTooltip)
+    .transition().duration(state.animation ? 500 : 0)
+    .delay((_, i) => i * 18)
+    .attr("opacity", 1);
+
+  document.getElementById(`${prefix}-stat`).textContent = `${result.words.length} words placed`;
+}
+
+document.getElementById("compare-shuffle-btn").addEventListener("click", async () => {
+  compareSeed += 17;
+  await renderComparison();
+});
+
+// ── WEIGHT DEMO ────────────────────────────────────────────────────────────
+const WD_W = 960, WD_H = 360;
+const WD_WORDS_INIT = [
+  ["cloud",60],["layout",55],["placement",50],["bitmap",48],["spiral",45],
+  ["word",42],["D3",58],["async",40],["render",38],["font",36],
+  ["animate",36],["stream",34],["board",32],["size",30],["color",28],
+];
+
+let wdSvg = null, wdWordsGroup = null, wdBoundsGroup = null;
+let wdWords = WD_WORDS_INIT.map(([text, value], i) => ({
+  text, value, color: PALETTES.vivid[i % PALETTES.vivid.length]
+}));
+let wdVersion = 0;
+
+function wdLog(msg, type = "info") {
+  const el = document.getElementById("weight-log");
+  const colors = { boost: "#4f46e5", remove: "#e11d48", add: "#0d9488", info: "#64748b" };
+  const icons  = { boost: "↑", remove: "✕", add: "+", info: "·" };
+  const row = document.createElement("div");
+  row.style.cssText = `font-size:12px;color:${colors[type]};display:flex;gap:6px;align-items:center;
+    padding:4px 8px;border-radius:6px;background:${colors[type]}18;animation:slideIn 0.2s ease`;
+  row.innerHTML = `<span style="font-weight:800">${icons[type]}</span><span>${msg}</span>`;
+  el.prepend(row);
+  if (el.children.length > 12) el.lastElementChild.remove();
+}
+
+function initWdSvg() {
+  wdSvg = setupSvg("weight-cloud", WD_W, WD_H);
+  drawGridLines(wdSvg, WD_W, WD_H, false);
+  wdBoundsGroup = wdSvg.append("g");
+  wdWordsGroup  = wdSvg.append("g");
+}
+
+// Full layout re-run every time — bitmap must be recalculated when sizes change.
+// For this demo we snap words to their new positions immediately and animate only
+// size / opacity. Tweening between old and new transform strings creates awkward
+// intermediate rotations and overlaps during removals.
+async function renderWdCloud(removedText = null) {
+  const v = ++wdVersion;
+  if (!wdSvg) initWdSvg();
+
+  // Remove the exiting word immediately before the new layout animates in.
+  // Letting the old word linger while the new layout settles causes a visible
+  // overlap when another word moves into the freed space.
+  if (removedText && wdWordsGroup) {
+    wdWordsGroup.selectAll("text.wd-word")
+      .filter(d => d.text === removedText)
+      .interrupt()
+      .remove();
+  }
+
+  const sizeScale = d3.scaleSqrt()
+    .domain(d3.extent(wdWords, w => w.value))
+    .range([14, 72]);
+
+  const layout = cloud()
+    .size([WD_W, WD_H])
+    .words(wdWords.map(d => ({ ...d })))
+    .font("Inter, sans-serif")
+    .fontWeight(d => d.value > 50 ? "800" : "500")
+    .fontSize(d => sizeScale(d.value))
+    .padding(4)
+    .rotate((d, i) => i % 5 === 0 ? 90 : 0)
+    .spiral("archimedean")
+    .random(seededRng(77))
+    .timeInterval(Infinity);
+
+  const result = await layout.startAsync();
+  if (v !== wdVersion) return;
+
+  document.getElementById("weight-demo-count").textContent = `${result.words.length} words`;
+  drawBounds(wdBoundsGroup, result.bounds, WD_W, WD_H, "#4f46e5", true);
+
+  // Stagger duration: boosted word gets a snappier elastic pop; others glide
+  const enterDur  = 480;
+  const updateDur = 420;
+  const exitDur   = 220;
+
+  wdWordsGroup.selectAll("text.wd-word")
+    .data(result.words, d => d.text)
+    .join(
+      enter => enter.append("text")
+        .attr("class", "wd-word cloud-word")
+        .attr("text-anchor", "middle")
+        .attr("font-family", "Inter, sans-serif")
+        .attr("font-weight", d => d.weight)
+        .attr("font-size", "2px")
+        .attr("fill", d => d.color)
+        .attr("opacity", 0)
+        .attr("transform", d => `translate(${d.x + WD_W/2},${d.y + WD_H/2}) rotate(${d.rotate})`)
+        .text(d => d.text)
+        .call(attachWdEvents)
+        .call(e => e.transition().duration(enterDur).ease(d3.easeBackOut.overshoot(1.4))
+          .attr("opacity", 1)
+          .attr("font-size", d => `${d.size}px`)),
+
+      update => update
+        .call(attachWdEvents)
+        .attr("transform", d => `translate(${d.x + WD_W/2},${d.y + WD_H/2}) rotate(${d.rotate})`)
+        .call(u => u.transition().duration(updateDur).ease(d3.easeCubicOut)
+          .attr("font-size", d => `${d.size}px`)
+          .attr("font-weight", d => d.weight)
+          .attr("fill", d => d.color)
+          .attr("opacity", 1)),
+
+      exit => exit.interrupt()
+        .transition().duration(exitDur).ease(d3.easeCubicIn)
+        .attr("opacity", 0)
+        .attr("font-size", "2px")
+        .remove(),
+    );
+}
+
+function attachWdEvents(sel) {
+  sel
+    .on("mouseenter", function(event, d) {
+      showTooltip(`${d.text} · weight ${d.value} · click to remove`, event);
+      d3.select(this).interrupt().transition().duration(120).attr("opacity", 0.55);
+    })
+    .on("mousemove", moveTooltip)
+    .on("mouseleave", function() {
+      hideTooltip();
+      d3.select(this).interrupt().transition().duration(120).attr("opacity", 1);
+    })
+    .on("click", (_, d) => {
+      const removed = d.text;
+      wdWords = wdWords.filter(w => w.text !== removed);
+      wdLog(`Removed "${removed}"`, "remove");
+      renderWdCloud(removed);
+    });
+}
+
+function wdBoost(text) {
+  const w = wdWords.find(x => x.text === text);
+  if (!w) return;
+  const prev = w.value;
+  w.value = Math.min(200, w.value + 20);
+  wdLog(`Boosted "${w.text}" ${prev} → ${w.value}`, "boost");
+  // Re-run full layout so the larger word is placed without overlaps,
+  // then the join animates every word to its new collision-free position.
+  renderWdCloud();
+}
+
+function buildWdChips() {
+  const el = document.getElementById("weight-chips");
+  el.innerHTML = "";
+  WD_WORDS_INIT.forEach(([text], i) => {
+    const color = PALETTES.vivid[i % PALETTES.vivid.length];
+    const chip = document.createElement("button");
+    chip.className = "btn btn-secondary btn-xs";
+    chip.style.borderColor = color;
+    chip.style.color = color;
+    chip.textContent = text;
+    chip.title = `Boost "${text}" +20 weight`;
+    chip.addEventListener("click", () => wdBoost(text));
+    el.appendChild(chip);
+  });
+}
+
+document.getElementById("weight-reset-btn").addEventListener("click", () => {
+  wdVersion++; // cancel any in-flight render
+  wdWords = WD_WORDS_INIT.map(([text, value], i) => ({
+    text, value, color: PALETTES.vivid[i % PALETTES.vivid.length]
+  }));
+  document.getElementById("weight-log").innerHTML = "";
+  wdLog("Demo reset", "info");
+  buildWdChips();
+  renderWdCloud();
+});
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+initMainSvg();
+initStreamSvg();
+initWdSvg();
+
+// Load a default preset
+const defaultPreset = PRESETS[0];
+state.words = defaultPreset.words.slice(0, 16).map(([text, value], i) => ({
+  text, value, color: getWordColor(i)
+}));
+renderWordList();
+
+buildWdChips();
+
+await Promise.all([
+  renderMainCloud(),
+  resetStream(),
+  renderComparison(),
+  renderWdCloud(),
+]);
+</script>
 </body>
 </html>

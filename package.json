@@ -18,16 +18,19 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "src/index.js",
-  "module": "src/index.js",
+  "main": "dist/d3-wordcloud.umd.js",
+  "module": "dist/d3-wordcloud.js",
   "jsdelivr": "dist/d3-wordcloud.min.js",
   "unpkg": "dist/d3-wordcloud.min.js",
   "exports": {
-    "umd": "./dist/d3-wordcloud.min.js",
-    "default": "./src/index.js"
+    ".": {
+      "import": "./dist/d3-wordcloud.js",
+      "default": "./dist/d3-wordcloud.umd.js"
+    },
+    "./umd": "./dist/d3-wordcloud.min.js",
+    "./package.json": "./package.json"
   },
   "files": [
-    "src/**/*.js",
     "dist/**/*.js",
     "index.html",
     "README.md",
@@ -44,6 +47,7 @@
   "scripts": {
     "build": "rollup -c",
     "test": "node --test",
+    "pretest": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "engines": {

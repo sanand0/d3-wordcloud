@@ -169,7 +169,18 @@
     .api-table code { font-family: monospace; font-size: 0.82rem; background: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 3px; }
 
     /* ── Animated demo controls ──────────────── */
-    .controls { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
+    .controls { margin-bottom: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    .range-control {
+      flex: 1 1 260px;
+      display: grid;
+      grid-template-columns: auto minmax(160px, 1fr);
+      gap: 0.75rem;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .range-control strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .range-control input { accent-color: var(--accent); width: 100%; }
     .btn {
       background: var(--accent);
       color: #fff;
@@ -259,15 +270,16 @@
 <!-- ── Incremental ────────────────────────────────────────────── -->
 <section id="demo-incremental">
   <h2>Incremental placement</h2>
-  <p>Call <code>cloud.add(words)</code> to place new words into the existing layout without disturbing already-placed ones. Pair with the <code>"word"</code> event to animate each arrival.</p>
+  <p>Move the slider to rebuild a deterministic prefix of the dataset. Words that remain in the prefix keep stable positions while new words fade in and removed words fade out.</p>
   <div class="controls">
-    <button class="btn" id="btn-add">Add 5 words</button>
-    <button class="btn secondary" id="btn-reset">Reset</button>
-    <span id="word-count" style="align-self:center;font-size:.85rem;color:var(--muted)"></span>
+    <label class="range-control" for="incremental-count">
+      <span><strong id="incremental-count-value">1</strong> words</span>
+      <input id="incremental-count" type="range" min="1" max="100" value="1">
+    </label>
   </div>
   <div class="example">
     <div>
-      <div class="cloud-box" id="cloud-incremental"><span class="loading">Click "Add 5 words" to begin</span></div>
+      <div class="cloud-box" id="cloud-incremental"><span class="loading">Rendering…</span></div>
     </div>
     <pre><code id="code-incremental" class="language-javascript"></code></pre>
   </div>
@@ -286,7 +298,13 @@
 <!-- ── Spirals ────────────────────────────────────────────────── -->
 <section id="demo-spirals">
   <h2>Spiral patterns</h2>
-  <p>Two built-in spiral strategies control how the layout searches outward from the centre. Words are uniform in size and coloured by placement order (purple → first, yellow → last), so the search path emerges as a colour gradient. A faint dashed line traces the raw mathematical spiral.</p>
+  <p>Two built-in spiral strategies control how the layout searches outward from the centre. Use the slider to compare stable prefixes from 20 to 100 words.</p>
+  <div class="controls">
+    <label class="range-control" for="spiral-count">
+      <span><strong id="spiral-count-value">60</strong> words</span>
+      <input id="spiral-count" type="range" min="20" max="100" value="60">
+    </label>
+  </div>
   <div class="example" style="grid-template-columns: 1fr;">
     <div class="two-up">
       <div>
@@ -420,44 +438,62 @@ function drawWords(svg, placed, colorFn, w = W, h = H) {
     );
 }
 
+function transitionWords(svg, placed, colorFn, w = W, h = H) {
+  svg.selectAll("text")
+    .data(placed, (d) => d.text)
+    .join(
+      (enter) => enter.append("text")
+        .attr("text-anchor", "middle")
+        .attr("transform", (d) => `translate(${d.x + w / 2},${d.y + h / 2}) rotate(${d.rotate}) scale(0.8)`)
+        .style("font-size",   (d) => `${d.size}px`)
+        .style("font-family", (d) => d.font)
+        .style("font-weight", (d) => d.weight)
+        .style("fill", colorFn)
+        .style("opacity", 0)
+        .text((d) => d.text)
+        .call((t) => t.transition().duration(280).style("opacity", 1).attr("transform", (d) => `translate(${d.x + w / 2},${d.y + h / 2}) rotate(${d.rotate}) scale(1)`)),
+      (update) => update.call((t) => t.transition().duration(280)
+        .attr("transform", (d) => `translate(${d.x + w / 2},${d.y + h / 2}) rotate(${d.rotate})`)
+        .style("font-size", (d) => `${d.size}px`)
+        .style("fill", colorFn)),
+      (exit) => exit.call((t) => t.transition().duration(180).style("opacity", 0).remove())
+    );
+}
+
 function seeded(s = 42) {
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
 }
 
-const palette = d3.scaleOrdinal(d3.schemeTableau10);
-const coolPal = d3.scaleOrdinal(d3.schemePastel1);
+const vivid = ["#e11d48", "#f97316", "#eab308", "#16a34a", "#06b6d4", "#2563eb", "#7c3aed", "#c026d3", "#db2777", "#059669"];
+const palette = d3.scaleOrdinal(vivid);
+const coolPal = d3.scaleOrdinal(["#00a6fb", "#7c3aed", "#ff006e", "#ffbe0b", "#3a86ff", "#06d6a0"]);
+
+function makeWords(terms, max = 2400, min = 120) {
+  return terms.map((text, i) => ({ text, value: Math.round(max - (max - min) * i / (terms.length - 1)) }));
+}
 
 // ─── Datasets ─────────────────────────────────────────────────────────────────
 
-const techWords = [
-  { text: "visualization", value: 2400 }, { text: "D3",          value: 2000 },
-  { text: "JavaScript",    value: 1800 }, { text: "SVG",          value: 1500 },
-  { text: "layout",        value: 1200 }, { text: "canvas",       value: 1000 },
-  { text: "word cloud",    value:  900 }, { text: "data",         value:  800 },
-  { text: "animation",     value:  700 }, { text: "incremental",  value:  650 },
-  { text: "spiral",        value:  600 }, { text: "collision",    value:  550 },
-  { text: "bitmap",        value:  500 }, { text: "font",         value:  450 },
-  { text: "rotate",        value:  400 }, { text: "placement",    value:  380 },
-  { text: "dispatch",      value:  350 }, { text: "ESM",          value:  320 },
-];
+const techWords = makeWords([
+  "visualization", "D3", "JavaScript", "SVG", "layout", "canvas", "word cloud", "data",
+  "animation", "incremental", "spiral", "collision", "bitmap", "font", "rotate", "placement",
+  "dispatch", "ESM", "browser", "scale", "axis", "transition", "selection", "join",
+  "geometry", "sprite", "padding", "bounds", "random", "seed", "module", "render",
+  "interaction", "accessor", "event", "workflow",
+]);
 
-const incrPool = [
-  { text: "JavaScript", value: 1600 }, { text: "Python",     value: 1500 },
-  { text: "TypeScript", value: 1300 }, { text: "Rust",       value: 1200 },
-  { text: "Go",         value: 1100 }, { text: "Java",       value: 1050 },
-  { text: "C++",        value:  900 }, { text: "Ruby",       value:  800 },
-  { text: "Swift",      value:  750 }, { text: "Kotlin",     value:  700 },
-  { text: "Scala",      value:  650 }, { text: "Haskell",    value:  600 },
-  { text: "Clojure",    value:  550 }, { text: "Elixir",     value:  500 },
-  { text: "Julia",      value:  480 }, { text: "R",          value:  460 },
-  { text: "Perl",       value:  440 }, { text: "PHP",        value:  420 },
-  { text: "C",          value:  400 }, { text: "Erlang",     value:  380 },
-  { text: "Zig",        value:  360 }, { text: "Nim",        value:  340 },
-  { text: "OCaml",      value:  320 }, { text: "F#",         value:  300 },
-  { text: "Dart",       value:  290 }, { text: "Lua",        value:  280 },
-  { text: "Groovy",     value:  260 }, { text: "COBOL",      value:  250 },
-  { text: "Fortran",    value:  240 }, { text: "BASIC",      value:  230 },
-];
+const incrPool = makeWords([
+  "JavaScript", "Python", "TypeScript", "Rust", "Go", "Java", "C++", "Ruby", "Swift", "Kotlin",
+  "Scala", "Haskell", "Clojure", "Elixir", "Julia", "R", "Perl", "PHP", "C", "Erlang",
+  "Zig", "Nim", "OCaml", "F#", "Dart", "Lua", "Groovy", "COBOL", "Fortran", "BASIC",
+  "Assembly", "SQL", "HTML", "CSS", "Shell", "PowerShell", "Objective-C", "VB.NET", "Delphi", "Ada",
+  "Crystal", "V", "D", "Elm", "PureScript", "Reason", "ReScript", "Solidity", "Move", "Apex",
+  "PL/SQL", "Tcl", "Scheme", "Racket", "Common Lisp", "Smalltalk", "Prolog", "Pascal", "Forth", "APL",
+  "J", "K", "Q", "MATLAB", "Octave", "SAS", "Stata", "SPSS", "Wolfram", "LabVIEW",
+  "ActionScript", "CoffeeScript", "LiveScript", "Hack", "ReasonML", "VHDL", "Verilog", "SystemVerilog", "ABAP", "Awk",
+  "Sed", "M4", "Make", "CMake", "Nix", "Dhall", "HCL", "TOML", "YAML", "JSON",
+  "GraphQL", "Cypher", "ECL", "Pony", "Red", "Ring", "Chapel", "NimScript", "Wren", "Idris",
+], 1800, 180);
 
 // ~100 AI/ML terms spanning a 200× range of values — creates bold dominants
 // surrounded by many small supporting terms.
@@ -514,13 +550,18 @@ const denseWords = [
   { text: "mixture of experts",  value:   60 }, { text: "constitutional AI", value: 56 },
 ];
 
-// 40 short common words all at the same value — reveals the spiral path via
-// colour-coded placement order.
+// 100 short common words at one value reveals the spiral path by placement order.
 const spiralWords = [
-  "the","be","to","of","and","a","in","that","have","it",
-  "for","not","on","with","he","as","you","do","at","this",
-  "but","his","by","from","they","we","say","her","she","or",
-  "an","will","my","one","all","would","there","their","what","so",
+  "the", "be", "to", "of", "and", "a", "in", "that", "have", "it",
+  "for", "not", "on", "with", "as", "you", "do", "at", "this", "but",
+  "by", "from", "they", "we", "say", "or", "an", "will", "one", "all",
+  "would", "there", "their", "what", "so", "up", "out", "if", "about", "who",
+  "get", "which", "go", "when", "make", "can", "like", "time", "no", "just",
+  "know", "take", "people", "into", "year", "good", "some", "could", "them", "see",
+  "other", "than", "then", "now", "look", "only", "come", "its", "over", "think",
+  "also", "back", "after", "use", "two", "how", "our", "work", "first", "well",
+  "way", "even", "new", "want", "because", "any", "these", "give", "day", "most",
+  "us", "is", "are", "was", "were", "has", "had", "may", "more", "many",
 ].map((text) => ({ text, value: 100 }));
 
 // ─── 1. Basic word cloud ──────────────────────────────────────────────────────
@@ -575,82 +616,60 @@ cloud()
 // is correct in both handlers.
 
 (function demoIncremental() {
+  const svg = svgCloud("cloud-incremental");
+  const slider = document.getElementById("incremental-count");
+  const label = document.getElementById("incremental-count-value");
   let layout = null;
-  let svgEl  = null;
-  let cursor = 0;
+  let runId = 0;
 
-  function initLayout() {
-    if (layout) { layout.stop(); layout = null; }
-    svgEl = svgCloud("cloud-incremental");
-    cursor = 0;
-    document.getElementById("word-count").textContent = "";
-
+  function render(count) {
+    label.textContent = count;
+    layout?.stop();
+    const id = ++runId;
     layout = cloud()
       .size([W, H])
-      .fontSize((d) => Math.sqrt(d.value) * 1.5)
+      .words(incrPool.slice(0, count).map((d) => ({ ...d })))
+      .fontSize((d) => Math.sqrt(d.value) * 1.25)
       .font("'Trebuchet MS', sans-serif")
-      .padding(4)
-      .on("word", (d) => {
-        const cx = d.x + W / 2, cy = d.y + H / 2;
-        // Scale from 0 at the word's final position — a minimal "pop" entry.
-        svgEl.append("text")
-          .datum(d)
-          .attr("text-anchor", "middle")
-          .attr("transform", `translate(${cx},${cy}) rotate(${d.rotate}) scale(0.1)`)
-          .style("font-size",   `${d.size}px`)
-          .style("font-family", d.font)
-          .style("fill",        palette(d.text))
-          .style("opacity",     0)
-          .text(d.text)
-          .transition()
-          .duration(380)
-          .ease(d3.easeCubicOut)
-          .attr("transform", `translate(${cx},${cy}) rotate(${d.rotate}) scale(1)`)
-          .style("opacity", 1);
-      });
+      .fontWeight((d, i) => i < 12 ? "700" : "500")
+      .rotate((d, i) => i % 7 === 0 ? 90 : 0)
+      .padding(3)
+      .random(seeded(11))
+      .timeInterval(16)
+      .on("end", (placed) => {
+        if (id === runId) transitionWords(svg, placed, (d) => palette(d.text));
+      })
+      .start();
   }
 
-  function addBatch() {
-    if (!layout) initLayout();
-    const batch = incrPool.slice(cursor, cursor + 5);
-    if (!batch.length) return;
-    cursor += batch.length;
-    layout.add(batch.map((d) => ({ ...d })));
-    document.getElementById("word-count").textContent =
-      `${layout.placed().length} word${layout.placed().length === 1 ? "" : "s"} placed`;
-  }
-
-  document.getElementById("btn-add").addEventListener("click", addBatch);
-  document.getElementById("btn-reset").addEventListener("click", () => {
-    if (layout) { layout.stop(); layout = null; }
-    svgEl = null; cursor = 0;
-    document.getElementById("word-count").textContent = "";
-    document.getElementById("cloud-incremental").innerHTML =
-      '<span class="loading">Click "Add 5 words" to begin</span>';
-  });
+  slider.addEventListener("input", () => render(+slider.value));
+  render(+slider.value);
 
   setCode("code-incremental", `
-// "word" fires with centre-relative x/y (same as "end").
-// Scale from 0.1 → 1 at the final position for a clean pop-in.
-const layout = cloud()
-  .size([500, 300])
-  .on("word", (d) => {
-    const cx = d.x + W / 2, cy = d.y + H / 2;
-    svg.append("text")
-      .attr("transform",
-        \`translate(\${cx},\${cy}) rotate(\${d.rotate}) scale(0.1)\`)
-      .style("opacity", 0)
-      .text(d.text)
-      .transition().duration(380).ease(d3.easeCubicOut)
-      .attr("transform",
-        \`translate(\${cx},\${cy}) rotate(\${d.rotate}) scale(1)\`)
-      .style("opacity", 1);
-  });
+const slider = document.querySelector("#word-count");
+let layout, runId = 0;
 
-layout.words(firstBatch).start();  // initialise board
-layout.add(nextBatch);             // extend without moving existing words
-layout.add(moreBatch);
-layout.clear().start();            // reset and rebuild
+function render(count) {
+  layout?.stop();
+  const id = ++runId;
+  layout = cloud()
+  .size([500, 300])
+  .words(words.slice(0, count))
+  .random(seeded(11))       // stable prefix layouts as count changes
+  .timeInterval(16)
+  .on("end", (placed) => {
+    if (id === runId) {
+      svg.selectAll("text").data(placed, (d) => d.text).join(
+        (enter) => enter.append("text").style("opacity", 0),
+        (update) => update,
+        (exit) => exit.transition().style("opacity", 0).remove()
+      );
+    }
+  })
+  .start();
+}
+
+slider.addEventListener("input", () => render(+slider.value));
 `);
 })();
 
@@ -710,11 +729,15 @@ cloud()
 // drawn as a dashed line make each strategy's geometry unmistakable.
 
 (function demoSpirals() {
+  const slider = document.getElementById("spiral-count");
+  const label = document.getElementById("spiral-count-value");
+
   function makeCloud(containerId, spiralName) {
     const svg = svgCloud(containerId);
+    let layout = null;
+    let runId = 0;
 
     // Draw the raw mathematical spiral path for visual reference.
-    const rng0 = seeded(42);
     const sf = spirals[spiralName]([W, H]);
     const pts = [];
     for (let t = 1; t <= 600; t += 2) {
@@ -730,53 +753,69 @@ cloud()
       .attr("stroke-width", 1)
       .attr("stroke-dasharray", "4 3");
 
-    // Colour by placement index: purple (first/centre) → yellow (last/edge).
-    const orderColor = d3.scaleSequential(d3.interpolatePlasma)
-      .domain([0, spiralWords.length - 1]);
-
-    cloud()
+    return (count) => {
+      layout?.stop();
+      const id = ++runId;
+      layout = cloud()
       .size([W, H])
-      .words(spiralWords.map((d) => ({ ...d })))
+      .words(spiralWords.slice(0, count).map((d) => ({ ...d })))
       .fontSize(() => 13)          // uniform size — reveals the pattern
       .font("'Courier New', monospace")
       .rotate(0)                   // all horizontal — clean grid-like layout
       .padding(2)
       .spiral(spiralName)
       .random(seeded(42))          // same seed for fair side-by-side
+      .timeInterval(16)
       .on("end", (placed) => {
-        svg.selectAll("text")
-          .data(placed)
-          .join("text")
-          .attr("text-anchor", "middle")
-          .attr("transform", (d) => `translate(${d.x + W / 2},${d.y + H / 2})`)
-          .style("font-size", "13px")
-          .style("font-family", "'Courier New', monospace")
-          .style("font-weight", "bold")
-          .style("fill", (d, i) => orderColor(i))
-          .style("opacity", 0)
-          .text((d) => d.text)
-          .transition().duration(300).style("opacity", 1);
+        if (id === runId) {
+          const color = d3.scaleSequential(d3.interpolateTurbo).domain([0, count - 1]);
+          transitionWords(svg, placed, (d, i) => color(i));
+        }
       })
       .start();
+    };
   }
 
-  makeCloud("cloud-archimedean", "archimedean");
-  makeCloud("cloud-rectangular", "rectangular");
+  const renderers = [
+    makeCloud("cloud-archimedean", "archimedean"),
+    makeCloud("cloud-rectangular", "rectangular"),
+  ];
+
+  function render(count) {
+    label.textContent = count;
+    renderers.forEach((render) => render(count));
+  }
+
+  slider.addEventListener("input", () => render(+slider.value));
+  render(+slider.value);
 
   setCode("code-spirals", `
 import { cloud, spirals } from "./src/index.js";
 
-// Colour words by their placement index to trace the search path.
-const orderColor = d3.scaleSequential(d3.interpolatePlasma)
-  .domain([0, words.length - 1]);
+const slider = document.querySelector("#spiral-count");
+let archimedean, rectangular;
 
-cloud()
-  .spiral("archimedean")  // or "rectangular"
-  .on("end", (placed) => {
-    svg.selectAll("text").data(placed).join("text")
-      .style("fill", (d, i) => orderColor(i));
-  })
-  .start();
+function render(svg, name, count) {
+  const color = d3.scaleSequential(d3.interpolateTurbo).domain([0, count - 1]);
+
+  return cloud()
+    .size([500, 300])
+    .words(words.slice(0, count))
+    .spiral(name)
+    .random(seeded(42))
+    .on("end", (placed) => {
+      svg.selectAll("text").data(placed, (d) => d.text).join("text")
+        .style("fill", (d, i) => color(i));
+    })
+    .start();
+}
+
+slider.addEventListener("input", () => {
+  archimedean?.stop();
+  rectangular?.stop();
+  archimedean = render(svgA, "archimedean", +slider.value);
+  rectangular = render(svgB, "rectangular", +slider.value);
+});
 
 // Draw the raw spiral path for overlay:
 const sf = spirals.archimedean([W, H]);

@@ -298,11 +298,11 @@
 <!-- ── Spirals ────────────────────────────────────────────────── -->
 <section id="demo-spirals">
   <h2>Spiral patterns</h2>
-  <p>Two built-in spiral strategies control how the layout searches outward from the centre. Use the slider to compare stable prefixes from 20 to 100 words.</p>
+  <p>Two built-in spiral strategies control how the layout searches outward from the centre. Use the slider to compare stable prefixes from 1 to 100 words.</p>
   <div class="controls">
     <label class="range-control" for="spiral-count">
       <span><strong id="spiral-count-value">60</strong> words</span>
-      <input id="spiral-count" type="range" min="20" max="100" value="60">
+      <input id="spiral-count" type="range" min="1" max="100" value="60">
     </label>
   </div>
   <div class="example" style="grid-template-columns: 1fr;">
@@ -464,6 +464,17 @@ function transitionWords(svg, placed, colorFn, w = W, h = H) {
 
 function seeded(s = 42) {
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
+}
+
+function coalesceInput(input, render, delay = 80) {
+  let timer = 0;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = 0;
+      render(+input.value);
+    }, delay);
+  });
 }
 
 const vivid = ["#e11d48", "#f97316", "#eab308", "#16a34a", "#06b6d4", "#2563eb", "#7c3aed", "#c026d3", "#db2777", "#059669"];
@@ -644,7 +655,7 @@ cloud()
       .start();
   }
 
-  slider.addEventListener("input", () => render(+slider.value));
+  coalesceInput(slider, render);
   render(+slider.value);
 
   setCode("code-incremental", `
@@ -671,7 +682,7 @@ function render(count) {
   .start();
 }
 
-slider.addEventListener("input", () => render(+slider.value));
+coalesceInput(slider, render);
 `);
 })();
 
@@ -788,7 +799,7 @@ cloud()
     renderers.forEach((render) => render(count));
   }
 
-  slider.addEventListener("input", () => render(+slider.value));
+  coalesceInput(slider, render);
   render(+slider.value);
 
   setCode("code-spirals", `

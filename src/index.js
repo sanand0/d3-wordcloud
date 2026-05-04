@@ -32,7 +32,6 @@ function rectangularSpiral(size) {
 export const spirals = { archimedean: archimedeanSpiral, rectangular: rectangularSpiral };
 
 export function cloud() {
-  // Configuration (all stored as functions via constant()).
   let size = [256, 256];
   let words = [];
   let timeInterval = Infinity;
@@ -47,11 +46,12 @@ export function cloud() {
   let rotate    = () => (~~(random() * 6) - 3) * 30;
   let padding   = () => 1;
 
-  // Persistent layout state — survive across add() calls.
-  let _board  = null; // Int32Array collision bitmap
-  let _bounds = null; // [{x,y}, {x,y}] bounding box of placed words
-  let _placed = [];   // all successfully placed word datums
-  let _timer  = null;
+  // These survive across add() calls so incremental placement has a board to
+  // collide against and callers can inspect the cumulative placed words.
+  let board = null;
+  let bounds = null;
+  let placed = [];
+  let timer = null;
 
   const event = dispatch("word", "end");
 
@@ -71,7 +71,7 @@ export function cloud() {
   function run(wordList) {
     const cr  = getContext();
     const sw  = size[0] >> 5; // board stride in 32-bit words
-    const board = _board;     // capture reference so async steps see same board
+    const currentBoard = board;
     const n = wordList.length;
     const batchPlaced = [];
     let i = -1;
@@ -87,23 +87,24 @@ export function cloud() {
       return d;
     }).sort((a, b) => b.size - a.size);
 
-    if (_timer) clearInterval(_timer);
-    _timer = setInterval(step, 0);
+    if (timer) clearInterval(timer);
+    timer = setInterval(step, 0);
     step();
 
     function step() {
       const start = Date.now();
-      while (Date.now() - start < timeInterval && ++i < n && _timer) {
+      while (Date.now() - start < timeInterval && ++i < n && timer) {
         const d = data[i];
         d.x = (size[0] * (random() + 0.5)) >> 1;
         d.y = (size[1] * (random() + 0.5)) >> 1;
         cloudSprite(cr, d, data, i);
-        if (d.hasText && placeWord(d, board, sw)) {
-          _placed.push(d);
+        if (d.hasText && placeWord(d, currentBoard, sw)) {
+          placed.push(d);
           batchPlaced.push(d);
-          if (_bounds) cloudBounds(_bounds, d);
-          else _bounds = [{ x: d.x + d.x0, y: d.y + d.y0 }, { x: d.x + d.x1, y: d.y + d.y1 }];
-          // Shift to centre-relative coordinates before notifying callers.
+          if (bounds) cloudBounds(bounds, d);
+          else bounds = [{ x: d.x + d.x0, y: d.y + d.y0 }, { x: d.x + d.x1, y: d.y + d.y1 }];
+          // The board uses top-left coordinates; the public API reports
+          // centre-relative coordinates to match d3-cloud.
           d.x -= size[0] >> 1;
           d.y -= size[1] >> 1;
           event.call("word", cloud, d);
@@ -111,12 +112,10 @@ export function cloud() {
       }
       if (i >= n) {
         cloud.stop();
-        event.call("end", cloud, batchPlaced, _bounds);
+        event.call("end", cloud, batchPlaced, bounds);
       }
     }
 
-    // Spiral outward from the word's starting position until a free spot is found,
-    // then stamp the word's bitmask into the shared board.
     function placeWord(tag, board, sw) {
       const startX   = tag.x;
       const startY   = tag.y;
@@ -136,10 +135,9 @@ export function cloud() {
           tag.x + tag.x0 < 0 || tag.y + tag.y0 < 0 ||
           tag.x + tag.x1 > size[0] || tag.y + tag.y1 > size[1]
         ) continue;
-        // Fast rectangular pre-check before expensive bitmask test.
-        if (!_bounds || collideRects(tag, _bounds)) {
+        // Reject by bounding box before testing the sprite bitmask.
+        if (!bounds || collideRects(tag, bounds)) {
           if (!cloudCollide(tag, board, size[0])) {
-            // Stamp the word sprite into the board.
             const w   = tag.width >> 5;
             const lx  = tag.x - (w << 4);
             const sx  = lx & 0x7f;
@@ -161,31 +159,26 @@ export function cloud() {
     }
   }
 
-  // Public API object.
   const cloud = {
-    // Start a fresh layout. Clears the board and re-places all current words.
     start() {
-      _board  = new Int32Array((size[0] >> 5) * size[1]);
-      _bounds = null;
-      _placed = [];
+      board = new Int32Array((size[0] >> 5) * size[1]);
+      bounds = null;
+      placed = [];
       run(words.slice());
       return cloud;
     },
 
-    // Stop any running async layout and free sprite memory.
     stop() {
-      if (_timer) {
-        clearInterval(_timer);
-        _timer = null;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
       }
       for (const d of words) delete d.sprite;
       return cloud;
     },
 
-    // Add words to the existing layout without disturbing already-placed words.
-    // If the layout has not been started, merges newWords into .words() and starts fresh.
     add(newWords) {
-      if (!_board) {
+      if (!board) {
         words = words.concat(newWords);
         return cloud.start();
       }
@@ -194,21 +187,17 @@ export function cloud() {
       return cloud;
     },
 
-    // Reset persistent layout state; the next start() begins from an empty board.
     clear() {
       cloud.stop();
-      _board  = null;
-      _bounds = null;
-      _placed = [];
+      board = null;
+      bounds = null;
+      placed = [];
       return cloud;
     },
 
-    // Return a snapshot of all successfully placed words.
     placed() {
-      return _placed.slice();
+      return placed.slice();
     },
-
-    // — Configuration (all chainable) ——————————————————————————
 
     words(_)        { return _ !== undefined ? (words = _, cloud) : words; },
     size(_)         { return _ !== undefined ? (size = [+_[0], +_[1]], cloud) : size; },
@@ -232,8 +221,6 @@ export function cloud() {
 
   return cloud;
 }
-
-// ─── Internal helpers ──────────────────────────────────────────────────────────
 
 function constant(v) {
   return typeof v === "function" ? v : () => v;
